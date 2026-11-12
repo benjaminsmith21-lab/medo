@@ -540,7 +540,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · phone or tablet';
+  var BOARD_VERSION='13 Nov 2026 · away weather';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2220,6 +2220,16 @@
       qs.addEventListener('change',function(){ev.quest=qs.value;evQuestCache.day='';sv();});
       b.appendChild(sField('Add a quest on the day','e.g. "Swim bag" on swimming days. Shows for the children above, even if it\'s switched off in the week plan.',[qs]));
       b.appendChild(sField('Make the board special on the day','Party colours, decorations and a big banner. Best for birthdays and one-off days, not weekly things.',[sSwitch(evSpecial(ev),function(v){ev.special=v;sv();})]));
+      var lcBox=el('div',{style:'flex:1;min-width:240px'});
+      (function drawLoc(){
+        lcBox.innerHTML='';
+        var cur=el('div',{'class':'row'});
+        cur.appendChild(el('span',null,ev.loc?'📍 '+ev.loc.name:'🏠 Home ('+(cfg.loc.name||'Frankston').split(',')[0]+')'));
+        if(ev.loc)cur.appendChild(sBtn('Use home','',function(){delete ev.loc;sv();wxLocChanged();drawLoc();}));
+        lcBox.appendChild(cur);
+        lcBox.appendChild(placeSearch('Away somewhere? Type the town',function(pl){ev.loc=pl;sv();wxLocChanged();drawLoc();}));
+      })();
+      b.appendChild(sField('Weather location','Going away? Set where, and "What should I wear?" uses that place\'s weather '+(r==='none'?'from the first to the last day':'on each of these days')+', then switches back home.',[lcBox]));
       var acts=el('div',{'class':'row',style:'justify-content:flex-end;margin-top:6px'});
       acts.appendChild(sConfirm('Delete event','Tap again to delete','linkbtn',function(){cfg.events.splice(idx,1);evQuestCache.day='';sv();renderSettings();}));
       b.appendChild(acts);d.appendChild(b);ec.appendChild(d);
@@ -2428,13 +2438,10 @@
   }
 
   // ---------- Weather ----------
-  function setWeather(inner){
-    sHead(inner,'Weather','Powers "What should I wear?" and the automatic sunscreen reminder.');
-    var lc=sCard('Location');
-    var curName=el('b',null,cfg.loc.name||'Frankston');
-    var cur=el('div',{'class':'row'});cur.appendChild(el('span',{'class':'muted'},'Currently:'));cur.appendChild(curName);lc.appendChild(cur);
-    var row=el('div',{'class':'row'});
-    var q=el('input',{type:'text',placeholder:'Type your town or suburb',style:'flex:1;min-width:180px'});
+  // Town search (Open-Meteo geocoding). Calls onPick({name,lat,lon}).
+  function placeSearch(placeholder,onPick){
+    var wrap=el('div'),row=el('div',{'class':'row'});
+    var q=el('input',{type:'text',placeholder:placeholder,style:'flex:1;min-width:180px'});
     var results=el('div',{'class':'locresults'});
     function doSearch(){
       var term=q.value.trim();if(term.length<2)return;
@@ -2446,14 +2453,22 @@
           list.sort(function(a,b){return (b.country_code==='AU')-(a.country_code==='AU');});
           list.forEach(function(p){
             results.appendChild(sBtn(p.name+(p.admin1?', '+p.admin1:'')+(p.country?', '+p.country:''),'locbtn',function(){
-              cfg.loc={name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude};sv();curName.textContent=cfg.loc.name;results.innerHTML='';q.value='';wx=null;fetchWx();
+              results.innerHTML='';q.value='';onPick({name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude});
             }));
           });
         }).catch(function(){results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t search right now. Check the internet connection.'));});
       }catch(e){}
     }
     q.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
-    row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));lc.appendChild(row);lc.appendChild(results);
+    row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));wrap.appendChild(row);wrap.appendChild(results);
+    return wrap;
+  }
+  function setWeather(inner){
+    sHead(inner,'Weather','Powers "What should I wear?" and the automatic sunscreen reminder.');
+    var lc=sCard('Location');
+    var curName=el('b',null,cfg.loc.name||'Frankston');
+    var cur=el('div',{'class':'row'});cur.appendChild(el('span',{'class':'muted'},'Currently:'));cur.appendChild(curName);lc.appendChild(cur);
+    lc.appendChild(placeSearch('Type your town or suburb',function(pl){cfg.loc=pl;sv();curName.textContent=pl.name;wx=null;fetchWx();}));
     inner.appendChild(lc);
     var sc=sCard('Sunscreen');
     sc.appendChild(sField('Add the sunscreen quest automatically','Appears when the sun will be strong in the next 8 hours, and disappears on low-UV days (most of winter).',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
@@ -2913,9 +2928,19 @@
     if(uvPeakAhead()>=uvLimit()){extras.push(['👒','Hat']);extras.push(['🧴','Sunscreen']);}
     return {band:band,wear:wear.concat(extras)};
   }
+  // ----- Where are we? Home, unless an event with its own location is on today -----
+  function wxLoc(){
+    var t=today0();
+    for(var i=0;i<(cfg.events||[]).length;i++){var ev=cfg.events[i];
+      if(ev.loc&&ev.loc.lat!=null&&occursOn(ev,t))return {name:ev.loc.name,lat:ev.loc.lat,lon:ev.loc.lon,away:true,emoji:ev.emoji||'📍',ev:ev.name||''};}
+    return {name:cfg.loc.name,lat:cfg.loc.lat,lon:cfg.loc.lon,away:false};
+  }
+  function locKey(L){return (+L.lat).toFixed(3)+','+(+L.lon).toFixed(3);}
+  function wxLocOK(){return !!(wx&&wx.lk===locKey(wxLoc()));}
+  function wxLocChanged(){if(!wxLocOK()){wx=null;renderWx();fetchWx();}}
   // ----- UV helpers -----
   function uvLimit(){return cfg.uvLimit||3;}
-  function wxFresh(){return !!(wx&&wx.date===today()&&wx.hours&&wx.hours.length);}
+  function wxFresh(){return !!(wx&&wx.date===today()&&wx.hours&&wx.hours.length&&wxLocOK());}
   function hourDate(s){var p=s.split(/[-T:]/);return new Date(+p[0],+p[1]-1,+p[2],+p[3],+(p[4]||0));}
   function uvPeakAhead(){ // highest UV forecast from now through the next 8 hours
     if(!wxFresh())return wx&&wx.date===today()?(wx.uv||0):0;
@@ -3004,7 +3029,8 @@
     document.getElementById('wxTemp').textContent='';
     document.getElementById('wxTitle').textContent='What should I wear?';
     // small print for grown-ups only
-    var sub=(cfg.loc.name?cfg.loc.name.split(',')[0]+' · ':'')+Math.round(wx.min)+'°→'+Math.round(wx.max)+'°';
+    var pn=(wx.place||cfg.loc.name||'').split(',')[0];
+    var sub=(pn?(wx.away?wx.awayEmoji+' ':'')+pn+' · ':'')+Math.round(wx.min)+'°→'+Math.round(wx.max)+'°';
     if(wx.rain>=20)sub+=' · rain '+wx.rain+'%';
     if(windWord(wx))sub+=' · gusts '+Math.round(wx.gust||wx.wind)+' km/h';
     var pk=uvPeakAhead();if(pk>=1)sub+=' · UV '+Math.round(pk);
@@ -3023,7 +3049,7 @@
   function weatherSpeech(){
     var o=outfit(wx),parts=[];
     var feel=feelWord(wx.max),wnd=windWord(wx);
-    parts.push('Today will be '+feel+(wnd?' and '+wnd:'')+'.');
+    parts.push((wx.away&&wx.place?'In '+wx.place.split(',')[0]+', today':'Today')+' will be '+feel+(wnd?' and '+wnd:'')+'.');
     if(wx.rain>=70)parts.push('It will rain, so take your raincoat.');
     else if(wx.rain>=40)parts.push('It might rain, so take your raincoat.');
     var SPOKEN={'Dress or skirt':'a dress or skirt','Dress & tights':'a dress and tights','T-shirt':'a t-shirt','Jumper':'a jumper',
@@ -3036,7 +3062,7 @@
     if(uvPeakAhead()>=uvLimit())parts.push('The sun will be strong today, so wear sunscreen and try and play in the shade. Don\'t forget your hat!');
     return parts.join(' ');
   }
-  function wxFreshNow(){return wx&&wx.date===today()&&Date.now()-(wx.at||0)<45*60000;}
+  function wxFreshNow(){return wx&&wx.date===today()&&Date.now()-(wx.at||0)<45*60000&&wxLocOK();}
   function speakWx(){
     keepAwake();
     if(wxFreshNow()){say(weatherSpeech());return;}
@@ -3051,7 +3077,7 @@
   var wxBusy=null;
   function fetchWx(){ // returns a promise: true when fresh weather arrived
     if(wxBusy)return wxBusy;
-    var L=cfg.loc;
+    var L=wxLoc();
     var url='https://api.open-meteo.com/v1/forecast?latitude='+L.lat+'&longitude='+L.lon+
       '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weather_code,wind_speed_10m_max,wind_gusts_10m_max'+
       '&hourly=uv_index,weather_code,precipitation_probability&timezone=auto&forecast_days=2';
@@ -3060,7 +3086,8 @@
       fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(j){
         var d=j.daily;
         wx={date:today(),now:j.current.temperature_2m,code:d.weather_code[0],max:d.temperature_2m_max[0],min:d.temperature_2m_min[0],
-            rain:d.precipitation_probability_max[0]||0,uv:d.uv_index_max[0]||0,at:Date.now(),
+            rain:d.precipitation_probability_max[0]||0,uv:d.uv_index_max[0]||0,at:Date.now(),lk:locKey(L),
+            place:L.name,away:L.away,awayEmoji:L.emoji||'',
             wind:(d.wind_speed_10m_max&&d.wind_speed_10m_max[0])||0,gust:(d.wind_gusts_10m_max&&d.wind_gusts_10m_max[0])||0,
             hours:(j.hourly&&j.hourly.time)||[],uvh:(j.hourly&&j.hourly.uv_index)||[]};
         // Daily weather_code is the WORST weather of the whole day (one passing shower = rain cloud),
