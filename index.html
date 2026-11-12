@@ -488,6 +488,8 @@
   .sulead{font-size:20px;text-align:center;margin:0}.susub{color:var(--muted);font-size:16px;margin:0}
   .subody .susub:first-of-type{}
   .sukids{display:flex;flex-direction:column;gap:10px}.sukid{display:flex;align-items:center;gap:10px}.sukid .bigname{flex:1;min-width:0}
+  .subday{width:150px;flex:none}
+  @media (max-width:560px){.sukid{flex-wrap:wrap}.subday{flex:1 1 100%;width:auto}}
   .sucur{font-size:20px;font-weight:800;margin:0}
   .sutime{font-size:34px;padding:10px 14px;max-width:220px}
   .btn.big{font-size:22px;padding:16px 22px}
@@ -565,7 +567,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · setup + tips';
+  var BOARD_VERSION='13 Nov 2026 · child birthdays';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1572,7 +1574,7 @@
   function openSetup(){
     setupStep=0;
     var defNames=['Big Kid','Little Kid'];
-    setupNames=cfg.kids.map(function(kd,i){return {id:kd.id,name:defNames.indexOf(kd.name)>-1?'':kd.name,emoji:kd.emoji};});
+    setupNames=cfg.kids.map(function(kd,i){return {id:kd.id,name:defNames.indexOf(kd.name)>-1?'':kd.name,emoji:kd.emoji,birthday:kd.birthday||''};});
     document.getElementById('setupOv').classList.add('show');drawSetup();
   }
   function closeSetup(){document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();render();renderWx();fetchWx();}
@@ -1580,8 +1582,8 @@
     // update, add or remove children to match the setup list
     setupNames.forEach(function(r,i){
       var kd=r.id&&cfg.kids.filter(function(x){return x.id===r.id;})[0];
-      if(kd){kd.name=r.name.trim()||kd.name;kd.emoji=r.emoji;}
-      else{cfg.kids.push({id:'k'+Math.random().toString(36).slice(2,9),name:r.name.trim()||('Child '+(cfg.kids.length+1)),emoji:r.emoji,mode:'grid',clothes:'shorts',reads:{count:0,last:'',prev:''},stars:{count:0,last:'',prev:''}});
+      if(kd){kd.name=r.name.trim()||kd.name;kd.emoji=r.emoji;kd.birthday=r.birthday||kd.birthday||'';}
+      else{cfg.kids.push({id:'k'+Math.random().toString(36).slice(2,9),name:r.name.trim()||('Child '+(cfg.kids.length+1)),emoji:r.emoji,birthday:r.birthday||'',mode:'grid',clothes:'shorts',reads:{count:0,last:'',prev:''},stars:{count:0,last:'',prev:''}});
         for(var d=0;d<7;d++){var src=cfg.days[d].kids[0]||[];cfg.days[d].kids.push(src.slice());}r.id=cfg.kids[cfg.kids.length-1].id;}
     });
     for(var k=cfg.kids.length-1;k>=0;k--){
@@ -1609,7 +1611,7 @@
     }
     else if(setupStep===1){
       body.appendChild(el('h2',null,'Who\'s using it?'));
-      body.appendChild(el('p',{'class':'susub'},'Tap a picture to change it.'));
+      body.appendChild(el('p',{'class':'susub'},'Tap a picture to change it. Add a birthday (optional) for a countdown and a party on the day.'));
       var list=el('div',{'class':'sukids'});body.appendChild(list);
       setupNames.forEach(function(r,i){
         var row=el('div',{'class':'sukid'});
@@ -1619,7 +1621,9 @@
         av.addEventListener('click',function(){grid.style.display=grid.style.display==='none'?'':'none';});
         var nm=el('input',{type:'text','class':'bigname',value:r.name,maxlength:'16',placeholder:'Child '+(i+1)+'\'s name'});
         nm.addEventListener('input',function(){r.name=nm.value;});
-        row.appendChild(av);row.appendChild(nm);
+        var bdi=el('input',{type:'date',value:r.birthday||'',max:today(),title:'Birthday (optional)','class':'subday'});
+        bdi.addEventListener('change',function(){r.birthday=bdi.value;});
+        row.appendChild(av);row.appendChild(nm);row.appendChild(bdi);
         if(setupNames.length>1){var rm=el('button',{'class':'linkbtn'},'Remove');rm.addEventListener('click',function(){setupNames.splice(i,1);drawSetup();});row.appendChild(rm);}
         list.appendChild(row);list.appendChild(grid);
       });
@@ -2109,6 +2113,12 @@
         AVATARS.forEach(function(a){var b=el('button',{'class':a===kid.emoji?'sel':''},a);b.addEventListener('click',function(){kid.emoji=a;openAvatar=-1;sv();renderSettings();});g.appendChild(b);});
         c.appendChild(g);
       }
+      var bd=el('input',{type:'date',value:kid.birthday||'',max:today()});
+      var bdNote=el('span',{'class':'muted'});
+      function bdText(){if(!kid.birthday){bdNote.textContent='';return;}var t0=today0(),o=nextOccurrence({date:kid.birthday,repeat:'birthday'},t0),dd=daysBetween(t0,o),ag=o.getFullYear()-parseD(kid.birthday).getFullYear();
+        bdNote.textContent=dd===0?'🎉 Turns '+ag+' today!':'Turns '+ag+' in '+dd+(dd===1?' day':' days');}
+      bd.addEventListener('change',function(){kid.birthday=bd.value;sv();bdText();});bdText();
+      c.appendChild(sField('🎂 Birthday','Adds a countdown to Events, plus party colours and a crown on their card on the day. Only this child gets the crown, even if a friend has the same name.',[bd,bdNote]));
       c.appendChild(sField('Board style','How their quests are shown.',[sSeg([['nownext','One at a time'],['grid','All at once']],kid.mode||'grid',function(v){kid.mode=v;sv();})]));
       c.appendChild(sField('Warm-day clothes','What "What should I wear?" suggests for them.',[sSeg([['shorts','Shorts'],['dress','Dresses & skirts'],['both','Both']],kid.clothes||'shorts',function(v){kid.clothes=v;sv();})]));
       c.appendChild(sField('📚 Days of reading','Set where they are up to. Ticking Reading adds one each day.',[sNum(kid.reads.count||0,0,function(v){kid.reads.count=v;sv();},110)]));
@@ -2297,6 +2307,15 @@
   // ---------- Events ----------
   function setEvents(inner){
     sHead(inner,'Events','Countdowns in "sleeps" on the home screen. Tap one on the board to hear it.');
+    var kb=sCard('🎂 Your children\'s birthdays');
+    cfg.kids.forEach(function(kd){
+      var txt='Not set';
+      if(kd.birthday){var t1=today0(),o=nextOccurrence({date:kd.birthday,repeat:'birthday'},t1),dd=daysBetween(t1,o),ag=o.getFullYear()-parseD(kd.birthday).getFullYear();
+        txt=fmtDate(kd.birthday).replace(/ \d{4}$/,'')+' · '+(dd===0?'today! 🎉':'turns '+ag+' in '+dd+(dd===1?' day':' days'));}
+      kb.appendChild(sField(kd.emoji+' '+kd.name,'',[el('span',{'class':kd.birthday?'':'muted'},txt)]));
+    });
+    kb.appendChild(el('div',{'class':'row'},null)).appendChild(sBtn('Set birthdays in Children','',function(){sTab='children';renderSettings();sBody.scrollTop=0;}));
+    inner.appendChild(kb);
     var ec=sCard('Your events','Birthdays, sport and activities, parties, playdates, holidays. Tap one to edit.');
     var t0=today0();
     cfg.events.forEach(function(ev,idx){
@@ -2312,7 +2331,7 @@
       // what + who
       var em=el('input',{type:'text','class':'emo',value:ev.emoji||'',maxlength:'4'});em.addEventListener('input',function(){ev.emoji=em.value;sv();});
       var nm=el('input',{type:'text',value:ev.name||'',placeholder:'What is it?',style:'flex:1;min-width:160px'});nm.addEventListener('input',function(){ev.name=nm.value;sv();});
-      b.appendChild(sField('Picture and name',r==='birthday'?'e.g. Ava\'s birthday':'e.g. Soccer training',[em,nm]));
+      b.appendChild(sField('Picture and name',r==='birthday'?'e.g. Grandma\'s birthday (your children\'s birthdays go in Children)':'e.g. Soccer training',[em,nm]));
       var whoBox=el('div',{'class':'chips'});
       cfg.kids.forEach(function(kd,k){
         var on=!ev.kids||!ev.kids.length||ev.kids.indexOf(k)>-1;
@@ -2389,7 +2408,7 @@
       b.appendChild(acts);d.appendChild(b);ec.appendChild(d);
     });
     var adds=el('div',{'class':'row',style:'margin-top:8px'});
-    [['🎂','Birthday','birthday'],['⚽','Sport / activity','weekly'],['🎈','Party','none'],['🧸','Playdate','none'],['🏖️','Holiday','none'],['⭐','Other','none']].forEach(function(p){
+    [['🎂','Someone\'s birthday','birthday'],['⚽','Sport / activity','weekly'],['🎈','Party','none'],['🧸','Playdate','none'],['🏖️','Holiday','none'],['⭐','Other','none']].forEach(function(p){
       adds.appendChild(sBtn('+ '+p[0]+' '+p[1],'',function(){
         var td=new Date(),ev={id:'e'+Date.now(),emoji:p[0],name:p[2]==='birthday'||p[1]==='Other'?'':(p[2]==='weekly'?'':p[1]),date:p[2]==='weekly'?ymd(td):'',end:'',repeat:p[2],lead:'',endMode:'never'};
         if(p[2]==='weekly'){ev.wdays=[td.getDay()];ev.special=false;}
@@ -2742,6 +2761,20 @@
   var DESTS=[['🚗','Car','into the car'],['🚌','Bus','onto the bus'],['🏫','School','off to school'],['🚲','Bike','onto your bike'],['🛴','Scooter','onto your scooter'],['🚶','Walk','out the door'],['🚆','Train','off to the train']];
   function destPhrase(){var d=DESTS.filter(function(x){return x[0]===cfg.leave.dest;})[0];return d?d[2]:'out the door';}
   if(!cfg.events)cfg.events=[];
+  // v9: a child's own birthday lives on the child (linked by the child, not by name)
+  if(cfg.v<9){
+    cfg.events=cfg.events.filter(function(ev){
+      if(rep_(ev)!=='birthday'||!ev.date)return true;
+      var who=(ev.name||'').replace(/'s birthday.*$/i,'').replace(/ birthday.*$/i,'').trim().toLowerCase();
+      var kd=cfg.kids.filter(function(x){return x.name.toLowerCase()===who&&!x.birthday;})[0];
+      if(!kd)return true;
+      // only move it if it's the one and only birthday event with that name (otherwise leave it for a grown-up to sort out)
+      var same=cfg.events.filter(function(e2){return rep_(e2)==='birthday'&&(e2.name||'').replace(/'s birthday.*$/i,'').replace(/ birthday.*$/i,'').trim().toLowerCase()===who;});
+      if(same.length!==1)return true;
+      kd.birthday=ev.date;if(ev.lead!=null&&ev.lead!=='')kd.bdayLead=ev.lead;return false;
+    });
+    cfg.v=9;save('qb_cfg',cfg);
+  }
   if(cfg.eventLead==null)cfg.eventLead=30;
   if(!cfg.holidays)cfg.holidays={on:true,state:'VIC',lead:14};
   var SPECIALS=[ // built-in celebrations: id, emoji, name, default days-ahead
@@ -2936,7 +2969,16 @@
       if(r==='birthday'){var age=occ.getFullYear()-st.getFullYear();meta.age=age;if(age>0&&age<120){nm=ev.name+' ('+age+')';sp=ev.name+'! Turning '+age;}}
       add(ev.emoji||(r==='birthday'?'🎂':'📅'),nm,occ,null,lead,sp,meta);
     });
-    out.forEach(function(it){it.key2=(it.kind||'')+':'+(it.raw||it.key||it.name);});
+    // the children's own birthdays (set in Children)
+    cfg.kids.forEach(function(kd){
+      if(!kd.birthday)return;
+      var pe={date:kd.birthday,repeat:'birthday'},occ=nextOccurrence(pe,t);if(!occ)return;
+      var age=occ.getFullYear()-parseD(kd.birthday).getFullYear(),nm=kd.name+'\'s birthday';
+      var lead=kd.bdayLead!=null&&kd.bdayLead!==''?+kd.bdayLead:cfg.eventLead;
+      add('🎂',nm+(age>0&&age<120?' ('+age+')':''),occ,null,lead,kd.name+(age>0&&age<120?'! Turning '+age:'\'s birthday'),
+        {kind:'birthday',raw:nm,special:true,kidId:kd.id,age:age,time:''});
+    });
+    out.forEach(function(it){it.key2=(it.kind||'')+':'+(it.kidId||it.raw||it.key||it.name);});
     out.sort(function(a,b){return a.days-b.days;});
     return out;
   }
@@ -2967,8 +3009,8 @@
       if(/easter|good friday/.test(n))return 'easter';
       return 'holiday';
     }
+    if(e.emoji==='🎈'||/party/.test(n))return 'party';   // e.g. "Mia's birthday party" is someone else's party
     if(/birthday/.test(n))return 'birthday';
-    if(e.emoji==='🎈'||/party/.test(n))return 'party';
     if(e.emoji==='🧸'||/play ?date|sleepover/.test(n))return 'playdate';
     if(['🏖️','✈️','⛺','🏕️','🌊'].indexOf(e.emoji)>-1||/holiday|camp|trip|beach/.test(n))return 'holiday';
     if(/christmas/.test(n))return 'christmas';if(/halloween/.test(n))return 'halloween';if(/easter/.test(n))return 'easter';
@@ -2992,14 +3034,16 @@
     var today=upcoming().filter(function(e){return (e.days===0||e.on)&&e.special!==false;});
     if(!today.length)return null;
     var rank={birthday:0,special:1,event:2,public:3};
-    today.sort(function(a,b){return (rank[a.kind]||9)-(rank[b.kind]||9);});
+    function rk(x){return rank.hasOwnProperty(x.kind)?rank[x.kind]:9;}
+    today.sort(function(a,b){return rk(a)-rk(b);});
     var e=today[0],key=themeOf(e);
     return {key:key,banner:bannerFor(key,e),item:e.key2,e:e};
   }
-  function birthdayKid(th){
-    if(!th||th.key!=='birthday'||!th.banner.who)return -1;
-    var w=th.banner.who.toLowerCase();
-    for(var k=0;k<nKids();k++)if(cfg.kids[k].name.toLowerCase()===w)return k;
+  function birthdayKid(th){ // which of OUR children is having the birthday (linked by the child, never by name)
+    if(!th||th.key!=='birthday')return -1;
+    if(previewTheme==='birthday')return 0;
+    var id=th.e&&th.e.kidId;if(!id)return -1;
+    for(var k=0;k<nKids();k++)if(cfg.kids[k].id===id)return k;
     return -1;
   }
   function applyTheme(){
