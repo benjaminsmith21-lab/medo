@@ -567,7 +567,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · child birthdays';
+  var BOARD_VERSION='13 Nov 2026 · worldwide';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -820,6 +820,12 @@
   function blip(){tone(660,0,0.12);tone(990,0.08,0.18);}
   function undoSound(){tone(400,0,0.15,'sine');tone(300,0.1,0.2,'sine');}
   function fanfare(){[523,659,784,1047,784,1047].forEach(function(f,i){tone(f,i*0.12,0.25,'square');});}
+  // Country from the device language (en-AU → AU), used for sensible defaults
+  function localeRegion(){var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';var m=l.match(/[-_]([A-Za-z]{2})(?:$|[-_])/);return m?m[1].toUpperCase():'';}
+  var F_COUNTRIES=['US','LR','MM','BS','BZ','KY','PW'];
+  function useF(){if(cfg.units)return cfg.units==='F';return F_COUNTRIES.indexOf((cfg.holidays&&cfg.holidays.country)||localeRegion())>-1;}
+  function tmp(c){return Math.round(useF()?c*9/5+32:c)+'°';}
+  function spd(k){return useF()?Math.round(k*0.621)+' mph':Math.round(k)+' km/h';}
   // Phone or tablet? Used so messages name the right thing. Unknown (e.g. a laptop) = "device".
   function devWord(){
     var ua=navigator.userAgent||'';
@@ -1132,7 +1138,9 @@
   var troph=load('qb_troph',{});   // {kidId:{badgeId:{t:tier, d:[date each tier was reached], seen:bool}}}
   var TIERS=['Bronze','Silver','Gold','Diamond','Legend'];
   var TIER_PTS=[1,3,6,10,15];     // level points for reaching each tier (running total)
-  var MONTH_EM=['🎆','💝','🍀','🐣','🍂','⛄','🧣','🪁','🌸','🎃','🌻','🎄'];
+  var MONTH_EM_S=['🎆','💝','🍀','🐣','🍂','⛄','🧣','🪁','🌸','🎃','🌻','🎄'];   // southern hemisphere seasons
+  var MONTH_EM_N=['⛄','💝','🍀','🐣','🌼','🌞','🍦','🏖️','🍎','🎃','🍂','🎄'];   // northern hemisphere seasons
+  function monthEm(i){return ((cfg.loc&&cfg.loc.lat)<0?MONTH_EM_S:MONTH_EM_N)[i];}
   var MONTH_NM=['January','February','March','April','May','June','July','August','September','October','November','December'];
   var HELP_IDS=['dishes','lunchbox','tidy','bed'];
   var LEVELS=[[0,'Rookie','🐣'],[3,'Explorer','🧭'],[8,'Adventurer','🎒'],[15,'Ranger','🏕️'],[25,'Hero','🦸'],[40,'Champion','🏅'],[60,'Superstar','🌟'],[85,'Legend','🐉'],[120,'Mythic','🦄'],[170,'Galaxy Master','🚀']];
@@ -1301,7 +1309,7 @@
     var mrow=el('div',{'class':'trow'});
     var mc=el('button',{'class':'tmonth'});
     var ring=el('div',{'class':'tring'});ring.style.background='conic-gradient(var(--c) '+Math.min(360,mfull/g*360)+'deg,#0e1130 0deg)';
-    ring.appendChild(medalEl(MONTH_EM[mi],st['m:'+ym]?'m':-1,'sm'));mc.appendChild(ring);
+    ring.appendChild(medalEl(monthEm(mi),st['m:'+ym]?'m':-1,'sm'));mc.appendChild(ring);
     var mt=el('div',{'class':'tmt'});mt.appendChild(el('div',{'class':'tmn'},MONTH_NM[mi]+' Challenge'));
     mt.appendChild(el('div',{'class':'tms'},st['m:'+ym]?'Done! ✅':'Finish every quest on '+g+' days'));
     mt.appendChild(el('div',{'class':'tmc'},Math.min(mfull,g)+' / '+g));
@@ -1310,7 +1318,7 @@
     mrow.appendChild(mc);
     var past=Object.keys(st).filter(function(id){return id.indexOf('m:')===0&&id!=='m:'+ym;}).sort().reverse();
     past.forEach(function(id){
-      var m2=+id.slice(7,9)-1,tile=tTile(medalEl(MONTH_EM[m2],'m'),MONTH_NM[m2].slice(0,3)+' '+id.slice(2,6),'Challenge',!st[id].seen);
+      var m2=+id.slice(7,9)-1,tile=tTile(medalEl(monthEm(m2),'m'),MONTH_NM[m2].slice(0,3)+' '+id.slice(2,6),'Challenge',!st[id].seen);
       tile.addEventListener('click',function(){showDetail({month:id.slice(2)});});mrow.appendChild(tile);
     });
     ms.appendChild(mrow);box.appendChild(ms);
@@ -1359,7 +1367,7 @@
     var card=el('div',{'class':'tdcard'}),words='';
     if(o.month){
       var mi=+o.month.slice(5,7)-1,e=st['m:'+o.month];
-      card.appendChild(medalEl(MONTH_EM[mi],'m','big'));
+      card.appendChild(medalEl(monthEm(mi),'m','big'));
       card.appendChild(el('div',{'class':'tdn'},MONTH_NM[mi]+' Challenge '+o.month.slice(0,4)));
       card.appendChild(el('div',{'class':'tds'},'Earned '+fmtDay(e.d[0])));
       words='The '+MONTH_NM[mi]+' challenge! You finished all your quests on lots of days that month.';
@@ -1635,7 +1643,7 @@
       body.appendChild(el('h2',null,'Where do you live?'));
       body.appendChild(el('p',{'class':'susub'},'For "What should I wear?" and the sunscreen reminder.'));
       var cur=el('p',{'class':'sucur'},'📍 '+(cfg.loc.name||'Frankston'));body.appendChild(cur);
-      body.appendChild(placeSearch('Type your town or suburb',function(pl){cfg.loc=pl;sv();wx=null;cur.textContent='📍 '+pl.name+' ✓';}));
+      body.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);cur.textContent='📍 '+pl.name+' ✓';}));
       nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',next));
     }
     else if(setupStep===3){
@@ -1790,7 +1798,7 @@
       else if(milestone){bigFanfare();confetti(k,['📚','🏆','⭐','🎉','✨']);showBanner('📚 '+milestone+'!',kd.name+' — '+milestone+' days of reading!');}
       else if(newB.length){badgeSound();var nb=newB[0];
         confetti(k,['🏆','🏅','✨','⭐','🎖️']);
-        showBanner(nb.month?medalEl(MONTH_EM[+nb.month.slice(5,7)-1],'m'):medalEl(nb.b.em,nb.b.secret?0:nb.t,nb.b.secret?'secretwon':''),kd.name+' won: '+newsTitle(nb)+'!');}
+        showBanner(nb.month?medalEl(monthEm(+nb.month.slice(5,7)-1),'m'):medalEl(nb.b.em,nb.b.secret?0:nb.t,nb.b.secret?'secretwon':''),kd.name+' won: '+newsTitle(nb)+'!');}
       else if(star){fanfare();confetti(k,['⭐','🌟','✨','⭐']);showBanner('⭐','I did it myself! ⭐ '+kd.stars.count+' in '+kd.name+'\'s jar');}
       else if(big){fanfare();confetti(k);}
       else blip();
@@ -2417,15 +2425,27 @@
     });
     ec.appendChild(adds);inner.appendChild(ec);
 
-    var hc=sCard('Public holidays','Updated automatically each week, including state-only days like Melbourne Cup.');
-    var hs=el('select');['ACT','NSW','NT','QLD','SA','TAS','VIC','WA'].forEach(function(st){var o=el('option',{value:st},st);if(st===cfg.holidays.state)o.selected=true;hs.appendChild(o);});
-    hs.addEventListener('change',function(){cfg.holidays.state=hs.value;sv();fetchHolidays();});
+    var hc=sCard('Public holidays','Updated automatically each week, including local-only days (like Melbourne Cup in Victoria).');
     hc.appendChild(sField('Show public holidays','',[sSwitch(cfg.holidays.on,function(v){cfg.holidays.on=v;sv();fetchHolidays();})]));
-    hc.appendChild(sField('State','',[hs]));
+    if(cfg.holidays.on){
+      var cs=el('select');
+      holCountries(function(list){cs.innerHTML='';list.forEach(function(c){var o=el('option',{value:c[0]},c[1]);if(c[0]===cfg.holidays.country)o.selected=true;cs.appendChild(o);});});
+      cs.addEventListener('change',function(){cfg.holidays.country=cs.value;cfg.holidays.region='';sv();fetchHolidays();renderSettings();});
+      hc.appendChild(sField('Country','Changes automatically when you set a home town in another country.',[cs]));
+      var regs=holRegions[cfg.holidays.country]||[];
+      if(regs.length){
+        var rs=el('select');rs.appendChild(el('option',{value:''},'Whole country only'));
+        regs.forEach(function(r){var o=el('option',{value:r.split('-')[1]},regionName(r));if(r.split('-')[1]===cfg.holidays.region)o.selected=true;rs.appendChild(o);});
+        rs.addEventListener('change',function(){cfg.holidays.region=rs.value;sv();fetchHolidays();render();});
+        hc.appendChild(sField('State / region','Adds holidays that only happen where you live.',[rs]));
+      }
+      var y0=today0().getFullYear(),c0=holCache[holKey(y0)];
+      if(c0&&c0.none)hc.appendChild(el('p',{'class':'status'},'⚠️ Public holidays aren\'t available for this country yet. Add the important ones yourself as events (Repeats: Yearly).'));
+    }
     hc.appendChild(sField('Start the countdown','Days before each holiday.',[sNum(cfg.holidays.lead,0,function(v){cfg.holidays.lead=v;sv();})]));
     inner.appendChild(hc);
 
-    var cc=sCard('Celebrations','Worked out automatically every year (Australian dates). Number = days of countdown.');
+    var cc=sCard('Celebrations','Worked out automatically every year, using the dates for your holiday country (e.g. Father\'s Day is in September in Australia, June in the US and UK). Number = days of countdown.');
     SPECIALS.forEach(function(x){
       var sp=cfg.specials[x[0]]||(cfg.specials[x[0]]={on:true,lead:x[3]});
       cc.appendChild(sField(x[1]+' '+x[2],'',[sNum(sp.lead,0,function(v){sp.lead=v;sv();},80),sSwitch(sp.on,function(v){sp.on=v;sv();})]));
@@ -2623,33 +2643,53 @@
         fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name='+encodeURIComponent(term)).then(function(r){return r.json();}).then(function(j){
           results.innerHTML='';var list=(j&&j.results)||[];
           if(!list.length){results.appendChild(el('p',{'class':'hint'},'No places found. Try a nearby bigger town.'));return;}
-          list.sort(function(a,b){return (b.country_code==='AU')-(a.country_code==='AU');});
+          var pref=(cfg.holidays&&cfg.holidays.country)||localeRegion()||'AU';
+          list.sort(function(a,b){return (b.country_code===pref)-(a.country_code===pref);});
           list.forEach(function(p){
             results.appendChild(sBtn(p.name+(p.admin1?', '+p.admin1:'')+(p.country?', '+p.country:''),'locbtn',function(){
-              results.innerHTML='';q.value='';onPick({name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude});
+              results.innerHTML='';q.value='';onPick({name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude,cc:p.country_code||'',admin1:p.admin1||''});
             }));
           });
         }).catch(function(){results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t search right now. Check the internet connection.'));});
       }catch(e){}
     }
     q.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
-    row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));wrap.appendChild(row);wrap.appendChild(results);
+    row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));
+    if(navigator.geolocation)row.appendChild(sBtn('📍 Use my location','',function(){
+      results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Finding you…'));
+      navigator.geolocation.getCurrentPosition(function(pos){results.innerHTML='';
+        onPick({name:'My location',lat:+pos.coords.latitude.toFixed(3),lon:+pos.coords.longitude.toFixed(3),cc:'',admin1:''});},
+        function(){results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t get your location. Type your town instead.'));},{timeout:15000,maximumAge:3600000});
+    }));
+    wrap.appendChild(row);wrap.appendChild(results);
     return wrap;
+  }
+  var AU_STATES={'Victoria':'VIC','New South Wales':'NSW','Queensland':'QLD','South Australia':'SA','Western Australia':'WA','Tasmania':'TAS','Northern Territory':'NT','Australian Capital Territory':'ACT'};
+  function setHome(pl){
+    cfg.loc={name:pl.name,lat:pl.lat,lon:pl.lon};
+    // moving country? public holidays follow (state too, for Australia)
+    if(pl.cc&&cfg.holidays&&(pl.cc!==cfg.holidays.country||(pl.cc==='AU'&&AU_STATES[pl.admin1]&&cfg.holidays.region!==AU_STATES[pl.admin1]))){
+      cfg.holidays.country=pl.cc;cfg.holidays.region=pl.cc==='AU'?(AU_STATES[pl.admin1]||''):'';fetchHolidays();
+    }
+    sv();wx=null;fetchWx();
   }
   function setWeather(inner){
     sHead(inner,'Weather','Powers "What should I wear?" and the automatic sunscreen reminder.');
     var lc=sCard('Location');
     var curName=el('b',null,cfg.loc.name||'Frankston');
     var cur=el('div',{'class':'row'});cur.appendChild(el('span',{'class':'muted'},'Currently:'));cur.appendChild(curName);lc.appendChild(cur);
-    lc.appendChild(placeSearch('Type your town or suburb',function(pl){cfg.loc=pl;sv();curName.textContent=pl.name;wx=null;fetchWx();}));
+    lc.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);curName.textContent=pl.name;}));
     inner.appendChild(lc);
+    var uc=sCard('Temperature');
+    uc.appendChild(sField('Show temperatures in','',[sSeg([['C','°C'],['F','°F']],useF()?'F':'C',function(v){cfg.units=v;sv();renderWx();renderSettings();})]));
+    inner.appendChild(uc);
     var sc=sCard('Sunscreen');
     sc.appendChild(sField('Add the sunscreen quest automatically','Appears when the sun will be strong in the next 8 hours, and disappears on low-UV days (most of winter).',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
-    sc.appendChild(sField('UV level that needs sunscreen','3 is the SunSmart guideline.',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();})]));
+    sc.appendChild(sField('UV level that needs sunscreen','3 is the guideline used by the WHO and SunSmart.',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();})]));
     inner.appendChild(sc);
     var cl=sCard('Clothes colours','The card turns one colour for the day, based on the top temperature.');
     var lg=el('div',{'class':'legend'});
-    [['#ff5e5e','27°+','Hot'],['#ff9f43','22–26°','Warm'],['#f6d743','17–21°','Nice'],['#4fa3ff','12–16°','Cool'],['#a77bff','under 12°','Cold']].forEach(function(x){
+    [['#ff5e5e',tmp(27)+'+','Hot'],['#ff9f43',tmp(22).replace('°','')+'–'+tmp(26),'Warm'],['#f6d743',tmp(17).replace('°','')+'–'+tmp(21),'Nice'],['#4fa3ff',tmp(12).replace('°','')+'–'+tmp(16),'Cool'],['#a77bff','under '+tmp(12),'Cold']].forEach(function(x){
       var i=el('div',{'class':'lgi'});var dot=el('span',{'class':'lgd'});dot.style.background=x[0];i.appendChild(dot);i.appendChild(el('span',null,x[2]+' · '+x[1]));lg.appendChild(i);
     });
     cl.appendChild(lg);cl.appendChild(el('p',{'class':'hint'},'Shorts or dresses for each child is set in Children.'));
@@ -2776,7 +2816,8 @@
     cfg.v=9;save('qb_cfg',cfg);
   }
   if(cfg.eventLead==null)cfg.eventLead=30;
-  if(!cfg.holidays)cfg.holidays={on:true,state:'VIC',lead:14};
+  if(!cfg.holidays)cfg.holidays={on:true,country:localeRegion()||'AU',region:'',lead:14};
+  if(!cfg.holidays.country){cfg.holidays.country='AU';cfg.holidays.region=cfg.holidays.state||'VIC';}
   var SPECIALS=[ // built-in celebrations: id, emoji, name, default days-ahead
     ['christmas','🎄','Christmas',30],['newyear','🎆','New Year\'s Eve',14],['easter','🐣','Easter',21],
     ['halloween','🎃','Halloween',14],['mothers','💐','Mother\'s Day',14],['fathers','👔','Father\'s Day',14]];
@@ -2797,8 +2838,10 @@
     if(id==='newyear')return new Date(y,11,31);
     if(id==='easter')return easterSunday(y);
     if(id==='halloween')return new Date(y,9,31);
-    if(id==='mothers')return nthSunday(y,4,2);   // 2nd Sunday in May (Australia)
-    if(id==='fathers')return nthSunday(y,8,1);   // 1st Sunday in September (Australia)
+    var cc=(cfg.holidays&&cfg.holidays.country)||'AU';
+    if(id==='mothers'){if(cc==='GB'||cc==='IE'){var e=easterSunday(y);return new Date(y,e.getMonth(),e.getDate()-21);}  // Mothering Sunday
+      return nthSunday(y,4,2);}                                                     // 2nd Sunday in May (most countries)
+    if(id==='fathers')return ['AU','NZ','FJ','PG'].indexOf(cc)>-1?nthSunday(y,8,1):nthSunday(y,5,3); // Sept 1st Sunday, else June 3rd Sunday
   }
   // Public holidays: Nager.Date (free, no key), cached per state and year. Falls back to national holidays worked out here.
   var holCache=load('qb_hol',{});
@@ -2807,31 +2850,56 @@
     return [[new Date(y,0,1),'New Year\'s Day'],[new Date(y,0,26),'Australia Day'],[gf,'Good Friday'],[em,'Easter Monday'],
       [new Date(y,3,25),'Anzac Day'],[new Date(y,11,25),'Christmas Day'],[new Date(y,11,26),'Boxing Day']].map(function(x){return {date:ymd(x[0]),name:x[1]};});
   }
+  var holRegions=load('qb_hreg',{});   // country → list of regions seen in its holiday data
+  function holKey(y){return cfg.holidays.country+'-'+(cfg.holidays.region||'')+'-'+y;}
   function holidaysFor(y){
-    var key=cfg.holidays.state+'-'+y;
-    return (holCache[key]&&holCache[key].list)||fallbackHolidays(y);
+    var c=holCache[holKey(y)];
+    if(c&&c.list)return c.list;
+    return cfg.holidays.country==='AU'?fallbackHolidays(y):[];
   }
   function fetchHolidays(){
     if(!cfg.holidays.on)return;
     var y=today0().getFullYear();
     [y,y+1].forEach(function(yr){
-      var key=cfg.holidays.state+'-'+yr;
+      var key=holKey(yr),cc=cfg.holidays.country,rg=cfg.holidays.region||'';
       if(holCache[key]&&Date.now()-holCache[key].at<7*864e5)return; // refresh weekly
       try{
-        fetch('https://date.nager.at/api/v3/PublicHolidays/'+yr+'/AU').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(list){
-          var st='AU-'+cfg.holidays.state;
-          var mine=list.filter(function(h){return (h.global||(h.counties||[]).indexOf(st)>-1)&&(h.types||['Public']).indexOf('Public')>-1;})
+        fetch('https://date.nager.at/api/v3/PublicHolidays/'+yr+'/'+cc).then(function(r){
+          if(r.status===404||r.status===204){holCache[key]={at:Date.now(),list:[],none:true};save('qb_hol',holCache);throw 0;}
+          if(!r.ok)throw 0;return r.json();
+        }).then(function(list){
+          var st=cc+'-'+rg,regs={};
+          list.forEach(function(h){(h.counties||[]).forEach(function(c){regs[c]=1;});});
+          holRegions[cc]=Object.keys(regs).sort();save('qb_hreg',holRegions);
+          var mine=list.filter(function(h){return (h.global||(rg&&(h.counties||[]).indexOf(st)>-1))&&(h.types||['Public']).indexOf('Public')>-1;})
             .map(function(h){return {date:h.date,name:h.name};});
           holCache[key]={at:Date.now(),list:mine};save('qb_hol',holCache);render();
+          if(document.getElementById('settings').classList.contains('open')&&sTab==='events')renderSettings();
         }).catch(function(){});
       }catch(e){}
     });
   }
+  var HOL_FALLBACK=[['AU','Australia'],['NZ','New Zealand'],['GB','United Kingdom'],['IE','Ireland'],['US','United States'],['CA','Canada'],['ZA','South Africa'],['SG','Singapore'],['DE','Germany'],['FR','France'],['NL','Netherlands'],['ES','Spain'],['IT','Italy']];
+  function holCountries(cb){
+    var c=load('qb_hcountries',null);
+    var have=c&&c.list&&c.list.length?c.list:HOL_FALLBACK;
+    if(!have.some(function(x){return x[0]===cfg.holidays.country;}))have=have.concat([[cfg.holidays.country,cfg.holidays.country]]);
+    cb(have);
+    if(c&&Date.now()-c.at<30*864e5)return;
+    try{fetch('https://date.nager.at/api/v3/AvailableCountries').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
+      var list=j.map(function(x){return [x.countryCode,x.name];}).sort(function(a,b){return a[1]<b[1]?-1:1;});
+      save('qb_hcountries',{at:Date.now(),list:list});cb(list);
+    }).catch(function(){});}catch(e){}
+  }
+  var REGION_NAMES={'GB-ENG':'England','GB-SCT':'Scotland','GB-WLS':'Wales','GB-NIR':'Northern Ireland'};
+  function regionName(code){return REGION_NAMES[code]||code.split('-')[1];}
   function holEmoji(n){
     n=n.toLowerCase();
     if(/christmas/.test(n))return '🎄';if(/boxing/.test(n))return '🎁';if(/new year/.test(n))return '🎆';if(/australia day/.test(n))return '🇦🇺';
     if(/anzac/.test(n))return '🎖️';if(/easter|good friday/.test(n))return '🐣';if(/labour/.test(n))return '🛠️';if(/king|queen/.test(n))return '👑';
-    if(/cup/.test(n))return '🏇';if(/grand final|football/.test(n))return '🏉';return '📅';
+    if(/cup/.test(n))return '🏇';if(/grand final|football/.test(n))return '🏉';
+    if(/thanksgiving/.test(n))return '🦃';if(/independence|national day|republic/.test(n))return '🎆';if(/memorial|remembrance|veterans/.test(n))return '🎖️';if(/labor/.test(n))return '🛠️';if(/waitangi/.test(n))return '🇳🇿';if(/canada day/.test(n))return '🇨🇦';if(/patrick/.test(n))return '☘️';
+    return '📅';
   }
   // ----- Recurring events (Outlook-style) -----
   // ev.repeat: none | daily | weekly | monthly | yearly | birthday
@@ -3232,9 +3300,9 @@
     document.getElementById('wxTitle').textContent='What should I wear?';
     // small print for grown-ups only
     var pn=(wx.place||cfg.loc.name||'').split(',')[0];
-    var sub=(pn?(wx.away?wx.awayEmoji+' ':'')+pn+' · ':'')+Math.round(wx.min)+'°→'+Math.round(wx.max)+'°';
+    var sub=(pn?(wx.away?wx.awayEmoji+' ':'')+pn+' · ':'')+tmp(wx.min)+'→'+tmp(wx.max);
     if(wx.rain>=20)sub+=' · rain '+wx.rain+'%';
-    if(windWord(wx))sub+=' · gusts '+Math.round(wx.gust||wx.wind)+' km/h';
+    if(windWord(wx))sub+=' · gusts '+spd(wx.gust||wx.wind);
     var pk=uvPeakAhead();if(pk>=1)sub+=' · UV '+Math.round(pk);
     var pt=protectionTimes();if(pt)sub+=' ('+fmtH(pt.from)+'–'+fmtH(pt.to)+')';
     document.getElementById('wxSub').textContent=sub;
