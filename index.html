@@ -567,7 +567,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · nicer countdowns';
+  var BOARD_VERSION='13 Nov 2026 · 6th birthday';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2999,6 +2999,9 @@
     }
     return evQuestCache.map[k]||[];
   }
+  function ordinal(n){var s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+  // "Marlo's 6th birthday" (works whether the event is called "Grandma" or "Grandma's birthday")
+  function bdayTitle(name,age){var who=(name||'').replace(/'s birthday.*$/i,'').replace(/ birthday.*$/i,'').trim();return who+(/s$/i.test(who)?'\' ':'\'s ')+ordinal(age)+' birthday';}
   function upcoming(){
     var t=today0(),y=t.getFullYear(),out=[],specialDays={};
     function add(emoji,name,start,end,lead,speakName,meta){
@@ -3034,7 +3037,7 @@
       if(r==='none'){add(ev.emoji||'📅',ev.name,st,ev.end?parseD(ev.end):null,lead,ev.name,meta);return;}
       var occ=nextOccurrence(ev,t);if(!occ)return;
       var nm=ev.name,sp=ev.name;
-      if(r==='birthday'){var age=occ.getFullYear()-st.getFullYear();meta.age=age;if(age>0&&age<120){nm=ev.name+' ('+age+')';sp=ev.name+'! Turning '+age;}}
+      if(r==='birthday'){var age=occ.getFullYear()-st.getFullYear();meta.age=age;if(age>0&&age<120){nm=bdayTitle(ev.name,age);sp=ev.name+'! Turning '+age;}}
       add(ev.emoji||(r==='birthday'?'🎂':'📅'),nm,occ,null,lead,sp,meta);
     });
     // the children's own birthdays (set in Children)
@@ -3043,7 +3046,7 @@
       var pe={date:kd.birthday,repeat:'birthday'},occ=nextOccurrence(pe,t);if(!occ)return;
       var age=occ.getFullYear()-parseD(kd.birthday).getFullYear(),nm=kd.name+'\'s birthday';
       var lead=kd.bdayLead!=null&&kd.bdayLead!==''?+kd.bdayLead:cfg.eventLead;
-      add('🎂',nm+(age>0&&age<120?' ('+age+')':''),occ,null,lead,kd.name+(age>0&&age<120?'! Turning '+age:'\'s birthday'),
+      add('🎂',age>0&&age<120?bdayTitle(kd.name,age):nm,occ,null,lead,kd.name+(age>0&&age<120?'! Turning '+age:'\'s birthday'),
         {kind:'birthday',raw:nm,special:true,kidId:kd.id,age:age,time:''});
     });
     out.forEach(function(it){it.key2=(it.kind||'')+':'+(it.kidId||it.raw||it.key||it.name);});
