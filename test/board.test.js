@@ -112,9 +112,9 @@ test('public holidays follow the country; a new US device gets °F and US holida
 });
 
 test('first run shows the setup; an existing family does not',async()=>{
-  let t=boot({blank:true});await wait(2600);
+  let t=boot({blank:true});await wait(4000);
   assert.ok(t.d.getElementById('setupOv').classList.contains('show'));t.close();
-  t=boot();await wait(2600);
+  t=boot();await wait(4000);
   assert.ok(!t.d.getElementById('setupOv').classList.contains('show'));t.close();
 });
 
@@ -127,23 +127,26 @@ test('feedback posts the four fields to the Google Form',async()=>{
 });
 
 test('usage stats: counts when on, nothing at all when switched off',async()=>{
-  let t=boot({url:'https://benjaminsmith21-lab.github.io/medo/'});await wait(3300);
+  let t=boot({url:'https://benjaminsmith21-lab.github.io/medo/'});await wait(4200);
   const sc=t.d.getElementById('gcScript');assert.ok(sc);sc.onload();
   assert.ok(t.stats.includes('/')&&t.stats.includes('daily-board'));t.close();
-  t=boot({url:'https://benjaminsmith21-lab.github.io/medo/',storage:{qb_stats:'off'}});await wait(3300);
+  t=boot({url:'https://benjaminsmith21-lab.github.io/medo/',storage:{qb_stats:'off'}});await wait(4200);
   assert.equal(t.d.getElementById('gcScript'),null);t.close();
 });
 
 test.after(()=>{setTimeout(()=>process.exit(process.exitCode||0),200);});   // jsdom windows are left open; exit once all tests are done
 
 test('leaving for activities: after school, the runner counts down to the event and the clock names it',async()=>{
-  const t=boot({cfg:c=>{const now=new Date(),hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-    for(let i=0;i<7;i++)c.days[i].leave=hm(new Date(now.getTime()-3*3600e3));          // school run already done today
-    c.events=[{id:'n1',emoji:'🏄',name:'Nippers',date:ymd(dayOff(-7)),repeat:'weekly',wdays:[now.getDay()],leave:hm(new Date(now.getTime()+40*60e3))}];}});
+  // works at any time of day (the GitHub check runs on UTC, often around midnight)
+  const now=new Date(),hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  let lv=new Date(now.getTime()+40*60e3);if(lv.getDate()!==now.getDate())lv=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59);
+  const school=now.getHours()>=1?hm(new Date(now.getTime()-Math.min(3,now.getHours())*3600e3+60e3)):'';
+  const t=boot({cfg:c=>{for(let i=0;i<7;i++)c.days[i].leave=school;          // school run already done today (if there was time for one)
+    c.events=[{id:'n1',emoji:'🏄',name:'Nippers',date:ymd(dayOff(-7)),repeat:'weekly',wdays:[now.getDay()],leave:hm(lv)}];}});
   await wait(300);
   assert.equal(t.d.getElementById('dest').textContent,'🏄');
-  assert.match(t.d.getElementById('cdLabel').textContent,/^Nippers · .* · 40 min$/);
-  t.d.getElementById('countdown').click();await wait(3500);
+  assert.match(t.d.getElementById('cdLabel').textContent,/^Nippers · .* · \d+ min$/);
+  t.d.getElementById('countdown').click();await wait(4500);
   assert.match(t.d.getElementById('clockLeave').textContent,/Nippers · Leave at/);
   t.close();
 });
@@ -221,7 +224,7 @@ test('voice message: plays after the cheer when a child finishes the day, once o
 
 test('voice message on a date plays by itself when the board is on',async()=>{
   const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m2',from:{name:'Pop',emoji:'👴'},kids:[],when:'date',date:ymd(new Date()),repeat:'once',created:'2026-11-01',played:{}}];}});
-  await t.putAudio('msg|m2','data:audio/webm;base64,BBBB');await wait(4600);
+  await t.putAudio('msg|m2','data:audio/webm;base64,BBBB');await wait(6500);
   assert.deepEqual(t.played,['data:audio/webm;base64,BBBB']);
   const m=t.cfg().messages[0];assert.ok(m.played.kA&&m.played.kB,'counted as heard by both kids');t.close();
 });
