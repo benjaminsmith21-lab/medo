@@ -1699,7 +1699,7 @@
     sc.onload=function(){gcReady=true;
       stats('/','Medo board',false);                                  // a board was opened
       var day=today(),last='';try{last=localStorage.getItem('qb_stats_day')||'';localStorage.setItem('qb_stats_day',day);}catch(e){}
-      if(last!==day){stats('daily-board',devWord()+' · '+nKids()+' kids');stats('version/'+BOARD_VERSION.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase(),BOARD_VERSION);}   // once per device per day
+      if(last!==day){stats('daily-board',devWord()+' · '+nKids()+' kids');stats('version/'+BOARD_VERSION.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase(),BOARD_VERSION);}   // once per device per day
       gcQueue.splice(0).forEach(function(c){try{goatcounter.count(c);}catch(e){}});
     };
     document.head.appendChild(sc);
