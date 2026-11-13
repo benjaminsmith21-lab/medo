@@ -621,7 +621,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · emoji picker';
+  var BOARD_VERSION='13 Nov 2026 · feedback on';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2887,7 +2887,8 @@
   // ---------- About & feedback ----------
   // Where feedback goes. Google Form: paste the form's "formResponse" address and the entry ids.
   // Email: used only if no form is set (opens the parent's email app with the message filled in).
-  var FEEDBACK={form:'',entries:{type:'',message:'',email:'',info:''},email:''};
+  var FEEDBACK={form:'https://docs.google.com/forms/d/e/1FAIpQLSfm246atX8OdOLD_oT2OCIiHEpISq3ZgLdGqQjkVqzUawEF4w/formResponse',
+    entries:{type:'entry.2053761877',message:'entry.178877530',email:'entry.903745266',info:'entry.2019410301'},email:''};
   function fbInfo(){return ['Medo '+BOARD_VERSION,devWord(),(navigator.userAgent.match(/(Android [\d.]+|iPhone OS [\d_]+|iPad|Windows NT [\d.]+|Mac OS X [\d_]+)/)||[''])[0],nKids()+' kids',cfg.holidays&&cfg.holidays.country||''].filter(Boolean).join(' · ');}
   function setAbout(inner){
     sHead(inner,'About Medo','');
