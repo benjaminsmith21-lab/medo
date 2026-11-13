@@ -650,7 +650,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · rewards + money jar';
+  var BOARD_VERSION='13 Nov 2026 · usage stats';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1207,7 +1207,7 @@
   }
   function rwGive(rw,kid){
     var t=today0();
-    rw.given=rw.given||{};(rw.given[kid]=rw.given[kid]||[]).push(today());
+    rw.given=rw.given||{};(rw.given[kid]=rw.given[kid]||[]).push(today());stats('reward-given',rw.kind==='money'?'money':'treat');
     var kd=cfg.kids.filter(function(x){return x.id===kid;})[0];
     if(kd){(kd.rewardLog=kd.rewardLog||[]).push({d:today(),emoji:rw.kind==='money'?'💰':(rw.emoji||'🎁'),name:rwPrize(rw)});
       if(rw.kind==='money'&&rw.amount>0)moneyMove(kd,+rw.amount,rwSummary(rw).replace(/^If they /,'For: '));}
@@ -1491,6 +1491,7 @@
     ov.classList.add('show');
     var n=trophCount(k),nNew=Object.keys(st).filter(function(id){return !st[id].seen;}).length;
     if(parent)return;
+    stats('trophies-opened','');
     say(kd.name+'\'s trophy case! You have '+n+(n===1?' badge':' badges')+'.'+(nNew?' '+nNew+' new! Look for the new ones.':' Tap a badge to hear about it.'));
     for(var id in st)st[id].seen=true;   // NEW labels show this time only
     save('qb_troph',troph);render();
@@ -1679,6 +1680,31 @@
     document.body.appendChild(o);
   }
 
+
+  // ================= Anonymous usage stats (GoatCounter) =================
+  // Counts only: boards opened, app version, device type, and which features get used.
+  // Never names, photos, quests' text or anything personal. Families can switch it off in This device.
+  var GC_URL='https://medoapp.goatcounter.com/count',gcQueue=[],gcReady=false;
+  function statsOn(){try{return localStorage.getItem('qb_stats')!=='off';}catch(e){return true;}}
+  function stats(path,title,isEvent){
+    if(!statsOn())return;
+    var c={path:path,title:title||'',event:isEvent!==false};
+    if(gcReady&&window.goatcounter&&goatcounter.count){try{goatcounter.count(c);}catch(e){}}else gcQueue.push(c);
+  }
+  function statsStart(){
+    if(!statsOn()||document.getElementById('gcScript'))return;
+    if(/^(localhost|127\.)/.test(location.hostname)||location.protocol!=='https:')return;   // not while testing
+    var sc=document.createElement('script');sc.id='gcScript';sc.async=true;sc.src='https://gc.zgo.at/count.js';
+    sc.setAttribute('data-goatcounter',GC_URL);sc.setAttribute('data-goatcounter-settings','{"no_onload":true}');
+    sc.onload=function(){gcReady=true;
+      stats('/','Medo board',false);                                  // a board was opened
+      var day=today(),last='';try{last=localStorage.getItem('qb_stats_day')||'';localStorage.setItem('qb_stats_day',day);}catch(e){}
+      if(last!==day){stats('daily-board',devWord()+' · '+nKids()+' kids');stats('version/'+BOARD_VERSION.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase(),BOARD_VERSION);}   // once per device per day
+      gcQueue.splice(0).forEach(function(c){try{goatcounter.count(c);}catch(e){}});
+    };
+    document.head.appendChild(sc);
+  }
+
   // ================= First-run setup, tips and kids' hints =================
   var tips=load('qb_tips',{});   // per device: which tips/hints have been seen
   function tipSeen(id){return !!tips[id];}
@@ -1725,7 +1751,7 @@
     setupNames=cfg.kids.map(function(kd,i){return {id:kd.id,name:defNames.indexOf(kd.name)>-1?'':kd.name,emoji:kd.emoji,birthday:kd.birthday||''};});
     document.getElementById('setupOv').classList.add('show');drawSetup();
   }
-  function closeSetup(){document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();render();renderWx();fetchWx();}
+  function closeSetup(done){stats(done?'setup-done':'setup-skipped',nKids()+' kids');document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();render();renderWx();fetchWx();}
   function applyKids(){
     // update, add or remove children to match the setup list
     setupNames.forEach(function(r,i){
@@ -1749,7 +1775,7 @@
     var body=el('div',{'class':'subody'}),nav=el('div',{'class':'sunav'});
     function next(){setupStep++;drawSetup();}
     function back(){setupStep--;drawSetup();}
-    var skipAll=el('button',{'class':'suskip'},'Skip setup');skipAll.addEventListener('click',closeSetup);
+    var skipAll=el('button',{'class':'suskip'},'Skip setup');skipAll.addEventListener('click',function(){closeSetup(false);});
     if(setupStep===0){
       var lg=document.getElementById('brand').querySelector('svg').cloneNode(true);lg.setAttribute('class','sulogo');body.appendChild(lg);
       body.appendChild(el('h1',null,'Welcome to Medo'));
@@ -1803,7 +1829,7 @@
       var tb=sBtn('🔊 Test the voice','primary big',function(){var v=cfg.voice;cfg.voice=true;say(hi);cfg.voice=v;});body.appendChild(tb);
       body.appendChild(sField('Voice on','',[sSwitch(cfg.voice!==false,function(v){cfg.voice=v;sv();})]));
       body.appendChild(el('p',{'class':'susub'},'A more natural voice downloads in the background. Until then the '+devWord()+'\'s own voice is used.'));
-      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Let\'s go! 🎉','primary',function(){closeSetup();confetti(0,['🎉','⭐','✨','🎊']);}));
+      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Let\'s go! 🎉','primary',function(){closeSetup(true);confetti(0,['🎉','⭐','✨','🎊']);}));
     }
     box.appendChild(dots);box.appendChild(body);box.appendChild(nav);
   }
@@ -1904,6 +1930,7 @@
     else{
       done.push(s.id);
       if(proofType)prog.proof[k][s.id]=proofType;
+      stats('quest-ticked',proofType?'with '+proofType+' proof':'');
       var per=curPeriod(),lines=[],big=false,milestone=0;
       var steps=todaysSteps(k,per);
       var left=steps.filter(function(x){return done.indexOf(x.id)<0;}).length;
@@ -1924,7 +1951,7 @@
       // star jar: everything done for the whole day
       var star=false;
       if(allDoneToday(k)&&kd.stars.last!==t){
-        kd.stars.prev=kd.stars.last;kd.stars.last=t;kd.stars.count=(kd.stars.count||0)+1;star=true;
+        kd.stars.prev=kd.stars.last;kd.stars.last=t;kd.stars.count=(kd.stars.count||0)+1;star=true;stats('full-day','Every quest done');
         lines.push('You did it all by yourself, '+kd.name+'!');
         lines.push('You earned a star for your star jar! You have '+kd.stars.count+(kd.stars.count===1?' star!':' stars!'));
       }
@@ -2245,7 +2272,7 @@
     var nav=document.getElementById('sNav');nav.innerHTML='';
     S_TABS.forEach(function(t){
       var b=el('button',{'class':t[0]===sTab?'sel':''});b.appendChild(el('span',{'class':'ni'},t[1]));b.appendChild(el('span',null,t[2]));
-      b.addEventListener('click',function(){sTab=t[0];renderSettings();sBody.scrollTop=0;});nav.appendChild(b);
+      b.addEventListener('click',function(){sTab=t[0];stats('settings/'+t[0],t[2]);renderSettings();sBody.scrollTop=0;});nav.appendChild(b);
     });
     sBody.innerHTML='';
     var inner=el('div',{'class':'s-inner'});sBody.appendChild(inner);
@@ -3013,7 +3040,7 @@
      ['By the time we got to the car, everyone was frustrated. The kids were starting their day being hurried and nagged, and we were starting ours feeling like the bad guys. It wasn\'t the morning any of us wanted.'],
      ['If that sounds familiar, you\'re not alone. It\'s rarely that kids won\'t help. It\'s that a string of reminders turns their job into ours, and turns us into the nag.'],
      ['So we built Medo to change who\'s in charge. The kids follow the pictures, tick off their own quests, hear a cheer for every one, and watch the little runner race to the car. We say less, cheer more, and mornings and afternoons feel calmer for everyone.'],
-     ['Medo is free. It works offline, keeps everything on your device, and has no ads and no accounts.']
+     ['Medo is free. It works offline, keeps everything on your device, and has no ads and no accounts. It counts anonymous usage (never names or personal details) to help make it better; you can switch that off in This device.']
     ].forEach(function(x,i){st.appendChild(el('p',{'class':i?'storyp':'storyh'},x[0]));});
     inner.appendChild(st);
     // why it works: the two taglines, explained through how young kids think
@@ -3048,7 +3075,7 @@
         if(FEEDBACK.entries.info)fd.append(FEEDBACK.entries.info,fbInfo());
         send.textContent='Sending…';
         fetch(FEEDBACK.form,{method:'POST',mode:'no-cors',body:fd}).then(function(){
-          msg.value='';em.value='';send.textContent='Send';status.style.display='';status.textContent='✅ Thank you! Your message has been sent.';
+          msg.value='';em.value='';send.textContent='Send';status.style.display='';status.textContent='✅ Thank you! Your message has been sent.';stats('feedback-sent',label);
         }).catch(function(){send.textContent='Send';status.style.display='';status.textContent='Couldn\'t send right now. Check the internet and try again.';});
       } else if(FEEDBACK.email){
         location.href='mailto:'+FEEDBACK.email+'?subject='+encodeURIComponent('Medo feedback: '+label)+'&body='+encodeURIComponent(m+'\n\n'+(em.value.trim()?'Reply to: '+em.value.trim()+'\n':'')+'— '+fbInfo());
@@ -3096,6 +3123,9 @@
       }catch(e){rs.textContent='That code didn\'t work';}
     });
     brow.appendChild(mk);brow.appendChild(rs);bk.appendChild(brow);inner.appendChild(bk);
+    var stc=sCard('📊 Anonymous usage stats');
+    stc.appendChild(sField('Help improve Medo','Shares simple counts, like how many boards are used each day, the app version, phone or tablet, and which features get used. Never names, photos, quests or anything personal. Saved for this device.',[sSwitch(statsOn(),function(v){try{localStorage.setItem('qb_stats',v?'on':'off');}catch(e){}if(v)statsStart();})]));
+    inner.appendChild(stc);
     var hc=sCard('🧭 Help');
     hc.appendChild(sField('Show the tips again','Brings back the 💡 tips in settings and the pointing hand for the kids.',[sBtn('Show tips','',function(){tips={};save('qb_tips',tips);renderSettings();})]));
     hc.appendChild(sField('Run the setup again','Children, town, leave time and voice. Nothing is deleted.',[sBtn('Run setup','',function(){document.getElementById('closeSettings').click();openSetup();})]));
@@ -3793,6 +3823,7 @@
   render();
   renderWx();
   fetchWx();
+  setTimeout(statsStart,3000);
   if(firstRun&&!cfg.setupDone)afterIntro(function(){setTimeout(openSetup,250);});
   // Offline support + install as an app
   var swReg=null;
