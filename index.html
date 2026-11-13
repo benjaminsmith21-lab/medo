@@ -585,7 +585,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · animated intro';
+  var BOARD_VERSION='13 Nov 2026 · sturdier updates';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1904,7 +1904,14 @@
   // ---------- Updates: the board checks for a new version and refreshes itself when nobody is using it ----------
   var updateReady=null,lastTouch=Date.now();
   document.addEventListener('pointerdown',function(){lastTouch=Date.now();},true);
+  function forceRefresh(){
+    var jobs=[];
+    try{if(navigator.serviceWorker)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));}catch(e){}
+    try{if(window.caches)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));}catch(e){}
+    Promise.all(jobs).catch(function(){}).then(function(){location.replace(location.pathname+'?fresh='+Date.now());});
+  }
   function checkUpdate(){
+    try{if(swReg)swReg.update();}catch(e){}   // also refresh the offline helper
     return fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
       var m=t.match(/var BOARD_VERSION='([^']*)'/);
       if(m&&m[1]!==BOARD_VERSION){updateReady=m[1];showUpdateBar();return true;}
@@ -2809,6 +2816,7 @@
     inner.appendChild(rc);
     var uc=sCard('Updates','The board checks for a new version every 10 minutes and refreshes itself when nobody has touched it for a minute or two.');
     var ust=el('span',{'class':'muted'},updateReady?'New version ready: '+updateReady:'Version: '+BOARD_VERSION);
+    var fr=sBtn('Force refresh','',function(){fr.textContent='Refreshing…';forceRefresh();});
     var ub=sBtn(updateReady?'Update now':'Check now','primary',function(){
       if(updateReady){applyUpdate();return;}
       ub.textContent='Checking…';
@@ -2819,6 +2827,7 @@
       });
     });
     uc.appendChild(sField('This board',null,[ust,ub]));
+    uc.appendChild(sField('Stuck on an old version?','Clears the saved offline copy of the board and reloads it from the internet. Your children, quests, stars, history and trophies are not touched.',[fr]));
     inner.appendChild(uc);
     inner.appendChild(el('p',{'class':'ssub',style:'text-align:center'},'Medo · routines they own · version '+BOARD_VERSION));
   }
@@ -3495,7 +3504,8 @@
   fetchWx();
   if(firstRun&&!cfg.setupDone)afterIntro(function(){setTimeout(openSetup,250);});
   // Offline support + install as an app
-  try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js');}catch(e){}
+  var swReg=null;
+  try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){swReg=r;}).catch(function(){});}catch(e){}
   document.getElementById('updBar').addEventListener('click',applyUpdate);
   var installEvt=null;
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;});
