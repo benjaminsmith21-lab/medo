@@ -504,9 +504,25 @@
   @keyframes hintbob{50%{transform:translateY(-22px)}}
   .tile.hintglow{box-shadow:0 0 0 6px #ffd23f,0 5px 0 rgba(0,0,0,.3);animation:hintglow 1s ease-in-out infinite}
   @keyframes hintglow{50%{box-shadow:0 0 0 12px rgba(255,210,63,.4),0 5px 0 rgba(0,0,0,.3)}}
+
+  /* ---- intro animation (after the system splash) ---- */
+  #intro{animation:inFail .3s 6s forwards;position:fixed;inset:0;z-index:200;background:#1b1f3b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;overflow:hidden;cursor:pointer}
+  #intro.out{animation:inOut .45s ease-in forwards}
+  @keyframes inFail{to{opacity:0;visibility:hidden}}   /* safety net: never block the board */
+  @keyframes inOut{to{opacity:0;transform:scale(1.08)}}
+  .in-logo{width:min(300px,60vw);height:auto;animation:inDrop .75s cubic-bezier(.3,1.5,.5,1) both}
+  @keyframes inDrop{0%{transform:translateY(-70vh) rotate(-25deg) scale(.6)}60%{transform:translateY(0) rotate(4deg) scale(1.08,.9)}80%{transform:scale(.96,1.05) rotate(-2deg)}100%{transform:none}}
+  .in-spark{position:absolute;left:50%;top:44%;font-size:30px;opacity:0;animation:inSpark .9s ease-out .55s both}
+  @keyframes inSpark{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}30%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.2) rotate(var(--r))}}
+  .in-kids{display:flex;gap:14px;min-height:72px}
+  .in-kid{font-size:clamp(46px,8vw,64px);line-height:1;opacity:0;animation:inPop .5s cubic-bezier(.3,1.8,.5,1) both}
+  @keyframes inPop{0%{opacity:0;transform:translateY(30px) scale(.3)}100%{opacity:1;transform:none}}
+  .in-hi{font-size:clamp(24px,4.4vw,40px);font-weight:800;color:#fff;opacity:0;animation:inPop .5s ease-out both;text-align:center;padding:0 20px}
+  @media (prefers-reduced-motion:reduce){.in-logo,.in-kid,.in-hi{animation:none;opacity:1}.in-spark{display:none}}
 </style>
 </head>
 <body>
+<div id="intro"></div>
 <div id="fx"></div>
 <button id="updBar" style="display:none">✨ New version ready · tap to update</button>
 <div id="app">
@@ -569,7 +585,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · holiday mode';
+  var BOARD_VERSION='13 Nov 2026 · animated intro';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1899,7 +1915,7 @@
     var b=document.getElementById('updBar');if(!b)return;
     b.style.display='';
   }
-  function applyUpdate(){location.reload();}
+  function applyUpdate(){try{sessionStorage.setItem('qb_quietReload','1');}catch(e){}location.reload();}   // silent update: skip the intro
   function idleUpdate(){
     if(!updateReady)return;
     var busy=document.getElementById('settings').classList.contains('open')||document.getElementById('clockOv').classList.contains('show')||document.getElementById('gate').classList.contains('open')||trophKid>-1||!!proofRun;
@@ -3444,10 +3460,40 @@
   window.addEventListener('focus',wxCheck);
   window.addEventListener('online',function(){fetchWx();});
 
+
+  // ================= Intro: a short animated hello after the system splash (tap to skip) =================
+  var introDone=false,introWaiters=[];
+  function afterIntro(fn){if(introDone)fn();else introWaiters.push(fn);}
+  function endIntro(){
+    if(introDone)return;introDone=true;var o=document.getElementById('intro');
+    o.classList.add('out');setTimeout(function(){o.remove();},460);
+    introWaiters.forEach(function(f){f();});introWaiters=[];
+  }
+  (function intro(){
+    var o=document.getElementById('intro');if(!o)return;
+    var quiet=false;try{quiet=sessionStorage.getItem('qb_quietReload')==='1';sessionStorage.removeItem('qb_quietReload');}catch(e){}
+    if(quiet){introDone=true;o.remove();return;}
+    var lg=document.getElementById('brand').querySelector('svg').cloneNode(true);lg.setAttribute('class','in-logo');o.appendChild(lg);
+    ['⭐','✨','🌟','💫','⭐','✨','🌟','💫'].forEach(function(ch,i){
+      var a=i/8*Math.PI*2,sp=el('span',{'class':'in-spark'},ch);
+      sp.style.setProperty('--dx',Math.round(Math.cos(a)*190)+'px');sp.style.setProperty('--dy',Math.round(Math.sin(a)*150)+'px');sp.style.setProperty('--r',(i%2?40:-40)+'deg');
+      sp.style.animationDelay=(0.55+i*0.03)+'s';o.appendChild(sp);
+    });
+    var kids=el('div',{'class':'in-kids'});
+    cfg.kids.slice(0,6).forEach(function(kd,i){var k=el('span',{'class':'in-kid'},kd.emoji);k.style.animationDelay=(0.8+i*0.14)+'s';kids.appendChild(k);});
+    o.appendChild(kids);
+    var h=new Date().getHours(),part=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+    var names=cfg.kids.map(function(x){return x.name;}),who=names.length>3?'everyone':names.length>1?names.slice(0,-1).join(', ')+' & '+names[names.length-1]:(names[0]||'');
+    var bk=-1;try{bk=birthdayKid(currentTheme());}catch(e){}
+    var hi=el('div',{'class':'in-hi'},bk>-1?'🎂 Happy birthday, '+cfg.kids[bk].name+'!':part+', '+who+'!');
+    hi.style.animationDelay=(0.85+cfg.kids.length*0.14)+'s';o.appendChild(hi);
+    o.addEventListener('click',endIntro);
+    setTimeout(endIntro,1500+cfg.kids.length*140+400);
+  })();
   render();
   renderWx();
   fetchWx();
-  if(firstRun&&!cfg.setupDone)setTimeout(openSetup,300);
+  if(firstRun&&!cfg.setupDone)afterIntro(function(){setTimeout(openSetup,250);});
   // Offline support + install as an app
   try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js');}catch(e){}
   document.getElementById('updBar').addEventListener('click',applyUpdate);
