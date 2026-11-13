@@ -623,7 +623,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · why it works';
+  var BOARD_VERSION='13 Nov 2026 · our story';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2898,8 +2898,10 @@
     var lg=document.getElementById('brand').querySelector('svg').cloneNode(true);lg.setAttribute('class','storylogo');st.appendChild(lg);
     [['It started with two little words.'],
      ['When our daughter was tiny, she\'d grab the toothbrush, the shoes, the cereal box, and announce "Me do!" She didn\'t want help. She wanted to do it herself.'],
-     ['Then mornings got busy. "Me do" turned into us reminding: teeth, shoes, bag, teeth again. Nobody enjoyed it.'],
-     ['So we built a board that hands the job back to the kids. They tick off their own quests, hear a cheer for every one, watch the little runner race to the car, and fill their own star jar. We just watch, and say less.'],
+     ['Then school mornings arrived. Teeth, shoes, bag, hat, out the door by quarter past eight. Afternoons were no easier: lunchbox, reading, dishes, pyjamas. We heard ourselves saying the same things five times, a little louder each time.'],
+     ['By the time we got to the car, everyone was frustrated. The kids were starting their day being hurried and nagged, and we were starting ours feeling like the bad guys. It wasn\'t the morning any of us wanted.'],
+     ['If that sounds familiar, you\'re not alone. It\'s rarely that kids won\'t help. It\'s that a string of reminders turns their job into ours, and turns us into the nag.'],
+     ['So we built Medo to change who\'s in charge. The kids follow the pictures, tick off their own quests, hear a cheer for every one, and watch the little runner race to the car. We say less, cheer more, and mornings and afternoons feel calmer for everyone.'],
      ['Medo is free. It works offline, keeps everything on your device, and has no ads and no accounts.']
     ].forEach(function(x,i){st.appendChild(el('p',{'class':i?'storyp':'storyh'},x[0]));});
     inner.appendChild(st);
@@ -2909,7 +2911,7 @@
      ['🖼️','Pictures do the remembering.','Young kids can only hold a step or two in their heads at once. A picture of the next job remembers for them, so the morning stops depending on how many times you ask. One-at-a-time mode keeps it to just one job for little ones.'],
      ['⏱️','Time they can see.','Most young kids can\'t read a clock yet, so "ten minutes" doesn\'t mean much. A runner moving towards the car, and a clock hand sweeping to leaving time, shows time passing in a way they understand.'],
      ['🎉','Praise for the doing.','The voice cheers the actual job ("You brushed your teeth!") rather than a general "good girl" or "good boy". Praising what they did helps the habit stick. Stars, rewards and trophies make progress something they can see growing.'],
-     ['🤝','Routines they own.','Put together, the routine stops being something you run and becomes something they run. For you, that means fewer reminders, fewer battles, and more mornings that start with a high five.']
+     ['🤝','Routines they own.','Put together, the routine stops being something you push and becomes something they run. That means fewer reminders and less frustration, and more mornings that start with a high five instead of a raised voice.']
     ].forEach(function(x){
       var r=el('div',{'class':'whyrow'});r.appendChild(el('span',{'class':'whyi'},x[0]));
       var t=el('div');t.appendChild(el('b',null,x[1]));t.appendChild(el('p',null,x[2]));r.appendChild(t);wh.appendChild(r);
