@@ -336,7 +336,16 @@
   .gate-box{background:var(--bg2);border-radius:22px;padding:22px 26px;text-align:center;width:min(92vw,420px)}
   .gate-box h2{margin:0 0 6px;font-size:26px}
   .gate-q{font-size:30px;font-weight:800;margin:6px 0 12px}
-  #gateInput{font-family:inherit;font-size:30px;width:140px;text-align:center;padding:8px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff;user-select:text;-webkit-user-select:text}
+  #gateInput{font-family:inherit;font-size:34px;font-weight:800;width:140px;text-align:center;padding:8px;border-radius:14px;border:2px solid #444b8a;background:#0e1130;color:#fff;caret-color:transparent;outline:none;pointer-events:none}
+  #gateInput.shake{animation:gshake .4s}
+  @keyframes gshake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px auto 4px;max-width:300px}
+  .keypad button{height:62px;border:none;border-radius:16px;background:#343b78;color:#fff;font-family:inherit;font-size:28px;font-weight:800;cursor:pointer;box-shadow:0 4px 0 #1f2452;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  .keypad button:active{transform:translateY(3px);box-shadow:0 1px 0 #1f2452}
+  .keypad .kfn{background:#2a2f63;font-size:24px}
+  .keypad .kok{background:#2ecc71;box-shadow:0 4px 0 #1e9e55}
+  .gate-cancel{margin-top:10px;font-size:17px;color:var(--muted)!important;background:none;border:none;font-family:inherit;cursor:pointer}
+  @media (max-height:560px){.keypad button{height:46px;font-size:22px}.gate-q{font-size:24px;margin:2px 0 6px}}
   .gate-msg{color:var(--bad);font-weight:700;min-height:26px;margin-top:6px}
 
   /* settings */
@@ -569,12 +578,15 @@
   <div class="gate-box">
     <h2>🔒 Grown-ups only</h2>
     <div id="gateQ" class="gate-q"></div>
-    <input id="gateInput" type="number" inputmode="numeric" pattern="[0-9]*">
+    <input id="gateInput" type="text" inputmode="none" readonly tabindex="-1" aria-label="Answer">
     <div id="gateMsg" class="gate-msg"></div>
-    <div class="row" style="justify-content:center;margin-top:10px">
-      <button class="btn" id="gateCancel">Cancel</button>
-      <button class="btn primary" id="gateOk">Open settings</button>
+    <div class="keypad" id="gateKeys">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button data-k="del" class="kfn" aria-label="Delete">⌫</button><button data-k="0">0</button><button id="gateOk" class="kok" aria-label="Open settings">✓</button>
     </div>
+    <button class="linkbtn gate-cancel" id="gateCancel">Cancel</button>
   </div>
 </div>
 
@@ -585,7 +597,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · sturdier updates';
+  var BOARD_VERSION='13 Nov 2026 · own keypad';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2073,14 +2085,22 @@
     gQ.textContent='What is '+gA+' × '+gB+'?';
     gInput.value='';gMsg.textContent='';
     gate.classList.add('open');
-    setTimeout(function(){try{gInput.focus();}catch(e){}},50);
   });
   function checkGate(){
     if(parseInt(gInput.value,10)===gA*gB){gate.classList.remove('open');openSettings();}
-    else{gMsg.textContent='Not quite — try again';gInput.value='';}
+    else{gMsg.textContent='Not quite, try again';gInput.value='';gInput.classList.remove('shake');void gInput.offsetWidth;gInput.classList.add('shake');}
   }
+  function gateKey(k){
+    gMsg.textContent='';
+    if(k==='del')gInput.value=gInput.value.slice(0,-1);
+    else if(gInput.value.length<3){gInput.value+=k;if(gInput.value.length===String(gA*gB).length)setTimeout(checkGate,180);}  // answers are always 2 digits: check as soon as both are in
+  }
+  [].forEach.call(document.querySelectorAll('#gateKeys button[data-k]'),function(b){b.addEventListener('click',function(){gateKey(b.getAttribute('data-k'));});});
+  document.addEventListener('keydown',function(e){   // a real keyboard still works (e.g. on a laptop)
+    if(!gate.classList.contains('open'))return;
+    if(/^[0-9]$/.test(e.key))gateKey(e.key);else if(e.key==='Backspace')gateKey('del');else if(e.key==='Enter')checkGate();else if(e.key==='Escape')gate.classList.remove('open');
+  });
   document.getElementById('gateOk').addEventListener('click',checkGate);
-  gInput.addEventListener('keydown',function(e){if(e.key==='Enter')checkGate();});
   document.getElementById('gateCancel').addEventListener('click',function(){gate.classList.remove('open');});
 
   // ---------- settings ----------
@@ -2720,7 +2740,14 @@
     inner.appendChild(uc);
     var sc=sCard('Sunscreen');
     sc.appendChild(sField('Add the sunscreen quest automatically','Appears when the sun will be strong in the next 8 hours, and disappears on low-UV days (most of winter).',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
-    sc.appendChild(sField('UV level that needs sunscreen','3 is the guideline used by the WHO and SunSmart.',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();})]));
+    var UVX={2:'Extra careful: even on low-UV days. For very fair skin, or kids who burn easily.',
+      3:'Recommended. Sunscreen from "moderate" UV upwards: the level the WHO and SunSmart use.',
+      4:'Skips the mildest moderate days. Fine for kids who rarely burn.',
+      5:'Only stronger days. Kids with fair skin can still burn at UV 3 to 4.',
+      6:'Only "high" UV days and above. Not advised for kids: UV 3 to 5 can still burn.'};
+    var uvx=el('p',{'class':'hint',style:'margin:4px 0 0'},UVX[uvLimit()]||'');
+    sc.appendChild(sField('UV level that needs sunscreen','The UV index runs from 1 (low) to 11+ (extreme).',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();uvx.textContent=UVX[+v];renderWx();})]));
+    sc.appendChild(uvx);
     inner.appendChild(sc);
     var cl=sCard('Clothes colours','The card turns one colour for the day, based on the top temperature.');
     var lg=el('div',{'class':'legend'});
