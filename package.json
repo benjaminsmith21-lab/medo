@@ -1,0 +1,11 @@
+{
+  "name": "medo",
+  "private": true,
+  "description": "Medo routine board. The app is index.html; this file is only for the tests.",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/board.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

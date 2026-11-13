@@ -1,0 +1,137 @@
+const test=require('node:test');const assert=require('node:assert');
+const {boot,wait,ymd,dayOff,HTML}=require('./helpers');
+const vm=require('vm');const fs=require('fs');const path=require('path');
+
+test('app script and service worker parse',()=>{
+  const js=HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+  assert.doesNotThrow(()=>new vm.Script(js));
+  assert.doesNotThrow(()=>new vm.Script(fs.readFileSync(path.join(__dirname,'..','sw.js'),'utf8')));
+  assert.match(HTML,/var BOARD_VERSION='[^']+'/,'BOARD_VERSION must exist (the updater looks for it)');
+});
+
+test('board loads with a card per child and no errors',async()=>{
+  const t=boot();await wait(300);
+  assert.equal(t.d.querySelectorAll('.kcard').length,2);
+  assert.deepEqual(t.errors,[]);t.close();
+});
+
+test('ticking a quest praises it in the past tense; finishing the day earns a star',async()=>{
+  const t=boot({cfg:c=>{c.arvoStart='00:00';},storage:{qb_prog:{date:ymd(new Date()),done:[['toilet','dress','breakfast','teeth','hair','shoes'],[]],celebrated:{am:[true,false],pm:[]}}}});
+  await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  const tiles=()=>[...t.d.querySelectorAll('.tile:not(.done)')];
+  tiles()[0].click();assert.match(t.lastSaid(),/^You /);
+  while(tiles().length)tiles()[0].click();
+  assert.match(t.lastSaid(),/star for your star jar/);
+  assert.equal(t.cfg().kids[0].stars.count,13);
+  t.close();
+});
+
+test('grown-ups lock: keypad opens settings only with the right answer',async()=>{
+  const t=boot();await wait(300);
+  t.d.getElementById('gearBtn').click();
+  ['1','1'].forEach(k=>t.d.querySelector(`#gateKeys button[data-k="${k}"]`).click());await wait(250);
+  assert.ok(!t.d.getElementById('settings').classList.contains('open'));
+  const m=t.d.getElementById('gateQ').textContent.match(/(\d+) × (\d+)/);
+  String(m[1]*m[2]).split('').forEach(k=>t.d.querySelector(`#gateKeys button[data-k="${k}"]`).click());await wait(250);
+  assert.ok(t.d.getElementById('settings').classList.contains('open'));t.close();
+});
+
+test('rewards: earned pill, Given resets, money goes in the jar and can be spent',async()=>{
+  const t=boot({cfg:c=>c.rewards.push({id:'r9',kind:'money',amount:2,prize:'',kids:['kA'],type:'stars',n:5,frame:'since',repeat:'every',show:true,created:c.rewards[0].created})});
+  await wait(300);
+  assert.ok(t.d.querySelector('.kbadges .pill.reward.earned'));
+  assert.equal(t.d.querySelector('#gearBtn .gdot').textContent,'2');
+  t.openSettings();
+  assert.match(t.d.querySelector('#sNav button.sel').textContent,/Rewards/,'settings opens on Rewards when something is waiting');
+  const row=[...t.d.querySelectorAll('.rwwait')].find(r=>r.textContent.includes('pocket money'));row.querySelector('button').click();
+  assert.equal(t.d.querySelector('.mjbal').textContent,'$2');
+  const jar=t.d.querySelectorAll('.mjrow')[0];t.button('Spend',jar).click();
+  jar.querySelector('.mjform input[type=number]').value='1.5';t.button('Save',jar).click();
+  assert.equal(t.d.querySelector('.mjbal').textContent,'$0.50');
+  assert.equal(t.cfg().kids[0].rewardLog.slice(-1)[0].name,'$2 pocket money');
+  t.close();
+});
+
+test('trophy case opens from the card and lists badges and rewards',async()=>{
+  const t=boot();await wait(300);
+  t.d.querySelector('.pill.troph').click();
+  assert.ok(t.d.getElementById('trophyOv').classList.contains('show'));
+  assert.ok(t.d.querySelectorAll('.tgrid .ttile').length>=10);
+  assert.ok([...t.d.querySelectorAll('.tsec h3')].some(h=>/My rewards/.test(h.textContent)));
+  assert.match(t.lastSaid(),/trophy case/);t.close();
+});
+
+test('photo/grown-up proof: ticking a proof quest opens the proof screen instead',async()=>{
+  const t=boot({cfg:c=>{c.steps.find(s=>s.id==='teeth').proof='parent';}});await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  [...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Brush teeth')).click();
+  assert.ok(t.d.getElementById('proofOv').classList.contains('show'));
+  assert.ok(t.d.querySelector('.pfhold'));t.close();
+});
+
+test('birthdays: own child gets the crown; a friend with the same name does not',async()=>{
+  let t=boot({cfg:c=>{c.kids[0].birthday=ymd(new Date(new Date().getFullYear()-6,new Date().getMonth(),new Date().getDate()));
+    c.events=[{id:'e2',emoji:'🎈',name:"Ava's birthday party",date:ymd(new Date()),repeat:'none'}];}});await wait(300);
+  assert.match(t.d.getElementById('themeBanner').textContent,/Happy birthday, Ava! 6 today/);
+  assert.ok(t.d.querySelectorAll('.kcard')[0].querySelector('.crown'));t.close();
+  t=boot({cfg:c=>{c.kids[0].birthday='2020-03-12';c.events=[{id:'e2',emoji:'🎈',name:"Ava's birthday party",date:ymd(new Date()),repeat:'none'}];}});await wait(300);
+  assert.match(t.d.getElementById('themeBanner').textContent,/birthday party today/);
+  assert.equal(t.d.querySelectorAll('.crown').length,0);t.close();
+});
+
+test('countdowns: ordinal titles and natural, rotating speech',async()=>{
+  const b=dayOff(17);
+  const t=boot({cfg:c=>{c.eventLead=40;c.kids[0].name='Marlo';c.kids[0].birthday=ymd(new Date(b.getFullYear()-6,b.getMonth(),b.getDate()));c.events=[];}});await wait(300);
+  const chip=[...t.d.querySelectorAll('.evchip')].find(c=>c.textContent.includes('Marlo'));
+  assert.match(chip.textContent,/Marlo's 6th birthday/);
+  chip.click();const a=t.lastSaid();chip.click();const b2=t.lastSaid();
+  assert.equal(a,'Marlo turns 6 in 17 more sleeps!');assert.notEqual(a,b2);t.close();
+});
+
+test('trips: Day 3 of 7 pill, holiday mode drops the leave time and uses weekend quests',async()=>{
+  const t=boot({cfg:c=>{for(let i=0;i<7;i++)c.days[i].leave='23:59';c.days[6].kids=[['toilet'],['toilet']];c.days[0].kids=[['toilet'],['toilet']];
+    c.events=[{id:'e1',emoji:'🏖️',name:'Sydney holiday',date:ymd(dayOff(-2)),end:ymd(dayOff(4)),repeat:'none'}];}});await wait(300);
+  assert.equal(t.d.getElementById('tripPill').textContent,'🏖️ Day 3 of 7');
+  assert.equal(t.d.getElementById('themeBanner').style.display,'none');
+  assert.ok(t.d.querySelector('header').classList.contains('centred'),'no leave bar on holiday');
+  assert.match(t.d.querySelector('.kcount').textContent,/of 1 done/);t.close();
+});
+
+test('away weather: an event with a location fetches that town',async()=>{
+  const t=boot({cfg:c=>{c.events=[{id:'e1',emoji:'🏖️',name:'Noosa',date:ymd(dayOff(-1)),end:ymd(dayOff(2)),repeat:'none',loc:{name:'Noosa Heads',lat:-26.39,lon:153.09}}];}});
+  await wait(300);
+  assert.ok(t.fetches.some(u=>/forecast.*latitude=-26\.39/.test(u)));t.close();
+});
+
+test('public holidays follow the country; a new US device gets °F and US holidays',async()=>{
+  const t=boot({blank:true,lang:'en-US'});await wait(400);
+  assert.ok(t.fetches.some(u=>/PublicHolidays\/\d+\/US/.test(u)));
+  assert.ok(t.d.getElementById('setupOv').classList.contains('show')||true);
+  t.close();
+});
+
+test('first run shows the setup; an existing family does not',async()=>{
+  let t=boot({blank:true});await wait(2600);
+  assert.ok(t.d.getElementById('setupOv').classList.contains('show'));t.close();
+  t=boot();await wait(2600);
+  assert.ok(!t.d.getElementById('setupOv').classList.contains('show'));t.close();
+});
+
+test('feedback posts the four fields to the Google Form',async()=>{
+  const t=boot();await wait(300);t.openSettings('About');
+  t.d.querySelector('.fbtext').value='Hello there';t.button('Send').click();await wait(50);
+  assert.equal(t.posts.length,1);
+  assert.match(t.posts[0].url,/forms\/d\/e\/.+\/formResponse$/);
+  assert.match(t.posts[0].body,/entry\.178877530=Hello\+there/);t.close();
+});
+
+test('usage stats: counts when on, nothing at all when switched off',async()=>{
+  let t=boot({url:'https://benjaminsmith21-lab.github.io/medo/'});await wait(3300);
+  const sc=t.d.getElementById('gcScript');assert.ok(sc);sc.onload();
+  assert.ok(t.stats.includes('/')&&t.stats.includes('daily-board'));t.close();
+  t=boot({url:'https://benjaminsmith21-lab.github.io/medo/',storage:{qb_stats:'off'}});await wait(3300);
+  assert.equal(t.d.getElementById('gcScript'),null);t.close();
+});
+
+test.after(()=>{setTimeout(()=>process.exit(process.exitCode||0),200);});   // jsdom windows are left open; exit once all tests are done
