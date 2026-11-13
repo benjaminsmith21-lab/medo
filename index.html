@@ -567,7 +567,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · worldwide';
+  var BOARD_VERSION='13 Nov 2026 · nicer countdowns';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3156,15 +3156,35 @@
       c.appendChild(tx);
       c.addEventListener('click',function(){
         keepAwake();
-        if(e.on)say(e.speak+' is on now!');
-        else if(e.days===0)say(e.time?e.speak+' is today, at '+sayTime(e.time)+'.':'Today is '+e.speak+'! Hooray!');
-        else if(e.days===1)say(e.speak+' is tomorrow'+(e.time?', at '+sayTime(e.time):'')+'! Just one more sleep!');
-        else say(e.days+' more sleeps until '+e.speak+'!');
+        say(countdownLine(e));
       });
       box.appendChild(c);
     });
   }
 
+  // What the board says when a countdown is tapped. Kids tap these again and again, so it takes turns between phrasings.
+  var chipTurn={};
+  function pick(e,arr){var k=e.key2||e.name,i=chipTurn[k]||0;chipTurn[k]=i+1;return arr[i%arr.length];}
+  function countdownLine(e){
+    var n=e.days,at=e.time?', at '+sayTime(e.time):'';
+    if(e.kind==='birthday'){
+      var P=e.kidId?((cfg.kids.filter(function(x){return x.id===e.kidId;})[0]||{}).name||''):(e.raw||e.name||'').replace(/'s birthday.*$/i,'').replace(/ birthday.*$/i,'').trim();
+      var A=e.age>0&&e.age<120?e.age:0;
+      if(n===0)return pick(e,A?['Happy birthday '+P+'! '+P+' is '+A+' today! Hooray!','It\'s '+P+'\'s birthday today! '+A+' years old! Hip hip hooray!']:['Happy birthday '+P+'! Hooray!']);
+      if(n===1)return pick(e,A?['Just one more sleep! Tomorrow '+P+' turns '+A+'!','One more sleep until '+P+' turns '+A+'!','Tomorrow is the big day! '+P+' turns '+A+'!']:['Just one more sleep until '+P+'\'s birthday!']);
+      var lines=A?[P+' turns '+A+' in '+n+' more sleeps!','Only '+n+' more sleeps until '+P+' turns '+A+'!',n+' sleeps to go, then '+P+' will be '+A+'!','Guess what? In '+n+' sleeps, '+P+' turns '+A+'!']
+                 :[P+'\'s birthday is in '+n+' more sleeps!','Only '+n+' more sleeps until '+P+'\'s birthday!'];
+      var line=pick(e,lines);
+      if(n<=7)line+=' That\'s less than a week!';
+      else if(n>=21&&n%7<=1)line+=' That\'s about '+Math.round(n/7)+' weeks.';
+      return line;
+    }
+    var nm=e.speak||e.name;
+    if(e.on)return nm+' is on now!';
+    if(n===0)return e.time?nm+' is today'+at+'.':pick(e,['Today is '+nm+'! Hooray!','It\'s '+nm+' today! Yay!']);
+    if(n===1)return pick(e,[nm+' is tomorrow'+at+'! Just one more sleep!','One more sleep until '+nm+'!'+(at?' It starts'+at+'.':'')]);
+    return pick(e,[n+' more sleeps until '+nm+'!',nm+' is in '+n+' sleeps!','Only '+n+' more sleeps, then it\'s '+nm+'!']);
+  }
   // ---------- weather & what to wear ----------
   if(!cfg.loc)cfg.loc={name:'Frankston',lat:-38.14,lon:145.12};
   var wx=load('qb_wx',null);
