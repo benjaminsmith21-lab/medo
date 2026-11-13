@@ -33,6 +33,7 @@
   .day{font-size:clamp(20px,3.2vw,34px);font-weight:800;line-height:1}
   header:not(.centred) .dt{display:flex;flex-direction:column;justify-content:center;gap:2px;flex:none;line-height:1}
   @media (max-width:640px){header:not(.centred){flex-wrap:wrap;row-gap:10px}header:not(.centred) .countdown{order:5;flex:1 1 100%}header:not(.centred) .dt{flex:1}}
+  .trippill{background:var(--accent,#ffd23f);color:#1b1f3b;border:none;border-radius:99px;padding:4px 12px;font-family:inherit;font-weight:800;font-size:clamp(14px,1.8vw,18px);cursor:pointer;white-space:nowrap;align-self:center}
   .clock{font-size:clamp(16px,2.4vw,26px);color:var(--muted);font-weight:700}
   .countdown{flex:1;display:flex;align-items:center;min-width:0}
   .cd-label{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;padding:0 6px;font-size:clamp(14px,1.8vw,19px);font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;pointer-events:none}
@@ -521,6 +522,7 @@
     <div class="dt" id="dt">
       <div class="day" id="dayName">Monday</div>
       <div class="clock" id="clock">7:30</div>
+      <button class="trippill" id="tripPill" style="display:none"></button>
     </div>
     <div class="countdown" id="countdown">
       <div class="road" id="road"><div class="road-fill" id="cdFill"></div><div class="cd-label" id="cdLabel"></div><div class="mover" id="mover">🏃</div><div class="car" id="dest">🚗</div></div>
@@ -567,7 +569,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · 6th birthday';
+  var BOARD_VERSION='13 Nov 2026 · holiday mode';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -789,9 +791,18 @@
   ensureProg();
 
   function stepById(id){for(var i=0;i<cfg.steps.length;i++)if(cfg.steps[i].id===id)return cfg.steps[i];return null;}
+  // Holiday mode: an event (e.g. a trip) that swaps school days for the weekend plan, with no leave time
+  function theName(n){return /^(the|our|my|a|an)\b/i.test(n)||/'s\b/.test(n)?n:'the '+n;}   // "the Sydney holiday", but "Grandma's visit"
+  function evHoliday(ev){if(ev.holiday!=null)return !!ev.holiday;return rep_(ev)==='none'&&!!(ev.loc||ev.emoji==='🏖️');}
+  function holidayToday(){var t=today0();return (cfg.events||[]).filter(function(ev){return evHoliday(ev)&&occursOn(ev,t);})[0]||null;}
+  function todayPlan(){
+    var dow=new Date().getDay(),h=holidayToday();
+    if(!h)return cfg.days[dow];
+    return {leave:'',kids:cfg.days[dow===0?0:6].kids};   // Saturday's quests (Sunday's on a Sunday)
+  }
   function todaysSteps(k,period){
     period=period||curPeriod();
-    var dc=cfg.days[new Date().getDay()];
+    var dc=todayPlan();
     var ids=(dc.kids[k]||[]).filter(function(id){var s=stepByIdRaw(id);return s&&stepPeriod(s)===period;});
     eventQuestIds(k).forEach(function(id){var s=stepByIdRaw(id);if(s&&stepPeriod(s)===period&&ids.indexOf(id)<0)ids.push(id);});
     // auto sunscreen from the UV forecast (falls back to the day's setting if no forecast) - mornings only
@@ -1836,7 +1847,7 @@
     document.getElementById('dayName').textContent=DAYS[now.getDay()];
     var h=now.getHours(),m=now.getMinutes();
     document.getElementById('clock').textContent=((h%12)||12)+':'+pad(m)+(h<12?' am':' pm');
-    var leave=cfg.days[now.getDay()].leave;
+    var leave=todayPlan().leave;
     var lbl=document.getElementById('cdLabel'),fill=document.getElementById('cdFill');
     var road=document.getElementById('road'),mover=document.getElementById('mover');
     function fmt(hm){var p=hm.split(':'),hh=+p[0];return ((hh%12)||12)+':'+p[1]+(hh<12?' am':' pm');}
@@ -1919,7 +1930,7 @@
     return p.join(' and ')||'no time';
   }
   function leaveInfo(){
-    var now=new Date(),leave=cfg.days[now.getDay()].leave;if(!leave)return null;
+    var now=new Date(),leave=todayPlan().leave;if(!leave)return null;
     var pp=leave.split(':'),lt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+pp[0],+pp[1]);
     return {h:+pp[0],m:+pp[1],mins:Math.ceil((lt-now)/60000)};
   }
@@ -2387,6 +2398,7 @@
         if(ev.endMode==='after'){endc.push(sNum(ev.count||10,1,function(v){ev.count=v;evQuestCache.day='';redraw();},80));endc.push(el('span',{'class':'muted'},'times'));}
         b.appendChild(sField('Ends','e.g. the last training of the season.',endc));
       }
+      if(r==='none'&&ev.end&&ev.end>ev.date)b.appendChild(sField('Holiday mode','On each day of this event: the weekend quests are used and there\'s no leave time. Handy for trips and school holidays.',[sSwitch(evHoliday(ev),function(v){ev.holiday=v;evQuestCache.day='';sv();render();})]));
       if(r==='none'){
         var en=el('input',{type:'date',value:ev.end||''});en.addEventListener('change',function(){ev.end=en.value;redraw();});
         b.appendChild(sField('Last day (optional)','For things that last a while, like holidays. Shows "On now!" during it.',[en]));
@@ -3008,7 +3020,7 @@
       var d=daysBetween(t,start),endD=end?daysBetween(t,end):d;
       if(endD<0)return false;
       if(d>lead&&d>0)return true;
-      var it={emoji:emoji,name:name,days:Math.max(d,0),on:d<=0&&endD>=0&&end&&endD>0,speak:speakName||name};
+      var it={emoji:emoji,name:name,days:Math.max(d,0),on:d<=0&&endD>=0&&end&&endD>0,speak:speakName||name,start:start,end:end||null};
       if(meta)for(var mk in meta)it[mk]=meta[mk];
       out.push(it);
       return true;
@@ -3123,7 +3135,22 @@
     document.body.classList.toggle('themed',!!T);
     document.body.style.background=T?T.bg:'';
     document.documentElement.style.setProperty('--accent',T?T.accent:'#ffd23f');
-    if(th){bn.style.display='';bn.firstChild.textContent=th.banner.text;bn.onclick=function(){keepAwake();say(th.banner.speak);};}
+    var pill=document.getElementById('tripPill');pill.style.display='none';
+    var e=th&&th.e,trip=null;
+    if(e&&e.end&&e.start&&!previewTheme){var t0=today0(),tot=daysBetween(e.start,e.end)+1,dn=daysBetween(e.start,t0)+1;if(tot>1&&dn>=1&&dn<=tot)trip={n:dn,tot:tot,left:tot-dn,name:e.raw||e.name,emoji:e.emoji};}
+    if(trip&&trip.n>1&&trip.n<trip.tot){   // middle of a trip: a small "Day 3 of 7" pill instead of the big banner
+      bn.style.display='none';
+      pill.style.display='';pill.textContent=trip.emoji+' Day '+trip.n+' of '+trip.tot;
+      var tn=theName(trip.name);
+      pill.onclick=function(ev){ev.stopPropagation();keepAwake();say(pick(e,['It\'s day '+trip.n+' of '+tn+'! The last day is in '+trip.left+(trip.left===1?' sleep.':' sleeps.'),
+        'We\'re on day '+trip.n+' of '+trip.tot+'. '+trip.left+' more '+(trip.left===1?'sleep':'sleeps')+' until the last day of '+tn+'!']));};
+    }
+    else if(th){
+      var txt=th.banner.text,spk=th.banner.speak;
+      if(trip&&trip.n===1){var TN=theName(trip.name);TN=TN.charAt(0).toUpperCase()+TN.slice(1);txt=trip.emoji+' '+TN+' starts today! 🎉';spk=TN+' starts today! It goes for '+trip.tot+' days. Hooray!';}
+      if(trip&&trip.n===trip.tot){txt=trip.emoji+' Last day of '+theName(trip.name)+'!';spk='Today is the last day of '+theName(trip.name)+'! Let\'s make it a good one!';}
+      bn.style.display='';bn.firstChild.textContent=txt;bn.onclick=function(){keepAwake();say(spk);};
+    }
     else bn.style.display='none';
     if(key===themeKeyShown)return;
     themeKeyShown=key;
