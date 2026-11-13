@@ -650,7 +650,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · usage stats';
+  var BOARD_VERSION='14 Nov 2026 · leave for activities';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1997,13 +1997,40 @@
     }
   }
 
+  // ---------- departures: the regular leave time plus events that need leaving for ----------
+  function departuresToday(){
+    var out=[],t=today0(),pl=todayPlan();
+    if(pl.leave)out.push({leave:pl.leave,dest:cfg.leave.dest,name:''});
+    (cfg.events||[]).forEach(function(ev){if(ev.leave&&occursOn(ev,t))out.push({leave:ev.leave,dest:ev.emoji||'🚗',name:ev.name||''});});
+    out.sort(function(a,b){return a.leave<b.leave?-1:1;});
+    return out;
+  }
+  function nextDeparture(){   // the one the runner should count down to right now
+    var now=new Date(),list=departuresToday();
+    for(var i=0;i<list.length;i++){
+      var p=list[i].leave.split(':'),lt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+p[0],+p[1]);
+      var mins=Math.ceil((lt-now)/60000),later=i<list.length-1;
+      if(mins>(later?-15:-90))return {leave:list[i].leave,dest:list[i].dest,name:list[i].name,h:+p[0],m:+p[1],mins:mins};
+    }
+    return null;
+  }
+  function leaveDest(){var D=nextDeparture();return (D&&D.dest)||cfg.leave.dest;}
+  // optional heads-up before leaving (Settings → Leaving)
+  function headsUpCheck(){
+    var lead=+cfg.leave.heads||0;if(!lead||document.hidden)return;
+    var D=nextDeparture();if(!D||D.mins<=0||D.mins>lead)return;
+    var key=today()+' '+D.leave;try{if(localStorage.getItem('qb_heads')===key)return;localStorage.setItem('qb_heads',key);}catch(e){}
+    var what=D.name||'Leaving';
+    showBanner(D.dest,what+' soon! Leave at '+fmtTime(D.leave));
+    say((D.name?D.name+' soon! ':'')+'We have to leave in '+durPhrase(D.mins)+'. Time to get ready!');
+  }
   // ---------- header / countdown ----------
   function renderHeader(){
     var now=new Date();
     document.getElementById('dayName').textContent=DAYS[now.getDay()];
     var h=now.getHours(),m=now.getMinutes();
     document.getElementById('clock').textContent=((h%12)||12)+':'+pad(m)+(h<12?' am':' pm');
-    var leave=todayPlan().leave;
+    var D=nextDeparture(),leave=D&&D.leave;
     var lbl=document.getElementById('cdLabel'),fill=document.getElementById('cdFill');
     var road=document.getElementById('road'),mover=document.getElementById('mover');
     function fmt(hm){var p=hm.split(':'),hh=+p[0];return ((hh%12)||12)+':'+p[1]+(hh<12?' am':' pm');}
@@ -2027,15 +2054,16 @@
     var lt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+parts[0],+parts[1]);
     var mins=Math.ceil((lt-now)/60000);
     var window_=cfg.leave.window||60; // the runner travels to the destination over this many minutes
-    var destEl=document.getElementById('dest');if(destEl.textContent!==cfg.leave.dest)destEl.textContent=cfg.leave.dest;
-    if(mins>window_){setRoad(0);setLbl('Leave at '+fmt(leave));}
-    else if(mins>0){setRoad((window_-mins)/window_*100);setLbl('Leave '+fmt(leave)+' · '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min'));}
+    var destEl=document.getElementById('dest');if(destEl.textContent!==D.dest)destEl.textContent=D.dest;
+    if(mins>window_){setRoad(0);setLbl(D.name?'Leave for '+D.name+' at '+fmt(leave):'Leave at '+fmt(leave));}
+    else if(mins>0){setRoad((window_-mins)/window_*100);setLbl((D.name?D.name+' · '+fmt(leave):'Leave '+fmt(leave))+' · '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min'));}
     else if(mins>-90){setRoad(100);lbl.classList.add('big');road.classList.add('go');setLbl('Time to go!');}
     else hdr.classList.add('centred'); // after the morning rush: just the day and time, centred
   }
   var lastDay=today();
   setInterval(function(){
     var ap=autoPeriod();
+    try{headsUpCheck();}catch(e){}
     if(today()!==lastDay){lastDay=today();render();renderWx();fetchWx();}
     else if(ap!==lastAuto){render();}
     else renderHeader();
@@ -2092,20 +2120,16 @@
     if(m)p.push(m===1?'one minute':m+' minutes');
     return p.join(' and ')||'no time';
   }
-  function leaveInfo(){
-    var now=new Date(),leave=todayPlan().leave;if(!leave)return null;
-    var pp=leave.split(':'),lt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+pp[0],+pp[1]);
-    return {h:+pp[0],m:+pp[1],mins:Math.ceil((lt-now)/60000)};
-  }
+  function leaveInfo(){var D=nextDeparture();return D?{h:D.h,m:D.m,mins:D.mins,name:D.name,dest:D.dest}:null;}
   function timeSpeechParts(){ // [what time it is now, what happens next]
     var n=new Date(),r=round5(n.getHours(),n.getMinutes()),now='It\'s '+clockPhrase(r[0],r[1])+'.',next='';
     var L=leaveInfo();
     if(L&&L.mins>0&&L.mins<=180){
       var lp=L.m%5===0?clockPhrase(L.h,L.m):(hourWord(L.h)+' '+L.m);
-      next='We have to leave at '+lp+'.';
+      next='We have to leave'+(L.name?' for '+L.name:'')+' at '+lp+'.';
       if(L.mins<=5)next+=' That\'s in just '+durPhrase(L.mins)+', so it\'s nearly time to go!';
       else next+=' That\'s in '+durPhrase(L.mins)+'.';
-    } else if(L&&L.mins<=0&&L.mins>-60)next='It\'s time to go! Shoes on and '+destPhrase()+'!';
+    } else if(L&&L.mins<=0&&L.mins>-60)next='It\'s time to go'+(L.name?' to '+L.name:'')+'! Shoes on and '+(L.name?'out the door':destPhrase())+'!';
     return [now,next];
   }
   function timeSpeech(){var p=timeSpeechParts();return (p[0]+' '+p[1]).trim();}
@@ -2133,7 +2157,7 @@
     sv+='<line id="ckH" x1="110" y1="110" x2="'+hp[0]+'" y2="'+hp[1]+'" stroke="#1b1f3b" stroke-width="9" stroke-linecap="round"/>';
     sv+='<line id="ckM" x1="110" y1="110" x2="'+mp[0]+'" y2="'+mp[1]+'" stroke="#2f7cff" stroke-width="6" stroke-linecap="round"/>';
     sv+='<circle cx="110" cy="110" r="7" fill="#1b1f3b"/>';
-    sv+='<text id="ckDest" x="0" y="0" font-size="24" text-anchor="middle" dominant-baseline="central" opacity="0">'+cfg.leave.dest+'</text>';
+    sv+='<text id="ckDest" x="0" y="0" font-size="24" text-anchor="middle" dominant-baseline="central" opacity="0">'+leaveDest()+'</text>';
     sv+='</svg>';
     return sv;
   }
@@ -2171,8 +2195,8 @@
     var L=leaveInfo(),lv=document.getElementById('clockLeave');
     var upcomingLeave=L&&L.mins>0&&L.mins<=180;
     lv.textContent='';lv.classList.remove('in');
-    var leaveText=upcomingLeave?cfg.leave.dest+' Leave at '+((L.h%12)||12)+':'+pad(L.m)+' · '+(L.mins>=60?Math.floor(L.mins/60)+' hr '+(L.mins%60)+' min':L.mins+' min')
-      :(L&&L.mins<=0&&L.mins>-60?cfg.leave.dest+' Time to go!':'');
+    var leaveText=upcomingLeave?leaveDest()+(L.name?' '+L.name+' ·':'')+' Leave at '+((L.h%12)||12)+':'+pad(L.m)+' · '+(L.mins>=60?Math.floor(L.mins/60)+' hr '+(L.mins%60)+' min':L.mins+' min')
+      :(L&&L.mins<=0&&L.mins>-60?leaveDest()+' Time to go!':'');
     ov.classList.add('show');
     clearTimeout(clockT);
     // step 1: the minute hand flashes while the time is read out
@@ -2542,6 +2566,14 @@
     custom.addEventListener('input',function(){if(custom.value.trim()){cfg.leave.dest=custom.value.trim();sv();}});
     cc.appendChild(sField('Running to','Also used on the clock and in "Shoes on and into the car!". Or type any emoji.',[sSeg(DESTS.map(function(x){return [x[0],x[0]+' '+x[1]];}),cfg.leave.dest,function(v){cfg.leave.dest=v;custom.value='';sv();}),custom]));
     inner.appendChild(cc);
+    var evl=(cfg.events||[]).filter(function(ev){return ev.leave;});
+    var ec=sCard('Leaving for activities','Sport, lessons and parties can have their own leave time. Set it on the event in Events → "We need to leave at". On those days the runner counts down to each one in turn.');
+    if(evl.length)evl.forEach(function(ev){ec.appendChild(sField((ev.emoji||'🚗')+' '+(ev.name||'Event'),repeatSummary(ev),[el('span',{'class':'muted'},'Leave '+fmtTime(ev.leave))]));});
+    else ec.appendChild(el('p',{'class':'muted'},'None yet.'));
+    ec.appendChild(el('div',{'class':'row',style:'margin-top:8px'},null)).appendChild(sBtn('Go to Events','',function(){sTab='events';renderSettings();sBody.scrollTop=0;}));
+    ec.appendChild(sField('Heads-up before leaving','Shows a banner and says "Nippers soon! We have to leave in 30 minutes" once, if the board is on. Off by default.',
+      [sSeg([['0','Off'],['15','15 min'],['30','30 min'],['45','45 min']],String(+cfg.leave.heads||0),function(v){cfg.leave.heads=+v;sv();})]));
+    inner.appendChild(ec);
     var kc=sCard('Talking clock','Pops up when a child taps the countdown or the time at the top.');
     kc.appendChild(sField('Say the time out loud','"It\'s twenty past seven. We have to leave at quarter past eight…"',[sSwitch(cfg.leave.speak!==false,function(v){cfg.leave.speak=v;sv();})]));
     kc.appendChild(sField('Show the time left','A coloured slice on the clock that shrinks as leaving gets closer (in the last hour).',[sSwitch(cfg.leave.showWedge!==false,function(v){cfg.leave.showWedge=v;sv();})]));
@@ -2643,6 +2675,14 @@
       cfg.steps.forEach(function(st){var o=el('option',{value:st.id},(/^svg:/.test(st.emoji)?'':st.emoji+' ')+st.label+(stepPeriod(st)==='pm'?' (afternoon)':''));if(ev.quest===st.id)o.selected=true;qs.appendChild(o);});
       qs.addEventListener('change',function(){ev.quest=qs.value;evQuestCache.day='';sv();});
       b.appendChild(sField('Add a quest on the day','e.g. "Swim bag" on swimming days. Shows for the children above, even if it\'s switched off in the week plan.',[qs]));
+      var lv=el('input',{type:'time',value:ev.leave||''});
+      lv.addEventListener('change',function(){ev.leave=lv.value||'';sv();render();redrawCal();});
+      var lvClear=sBtn('No leaving','',function(){ev.leave='';lv.value='';sv();render();redrawCal();});
+      b.appendChild(sField('We need to leave at','The runner counts down to this on the day, using this event\'s picture as the destination. Great for sport and lessons after school.',[lv,lvClear]));
+      var calBox=el('div');
+      function redrawCal(){calBox.innerHTML='';if(!ev.leave)return;
+        calBox.appendChild(sField('Reminder on the tablet','Adds "Leave for '+(ev.name||'this')+'" to Google Calendar (with the repeats). The calendar\'s reminder pops up even when another app is open.',[sBtn('📅 Add to Google Calendar','',function(){window.open(gcalLink(ev),'_blank','noopener');})]));}
+      redrawCal();b.appendChild(calBox);
       b.appendChild(sField('Make the board special on the day','Party colours, decorations and a big banner. Best for birthdays and one-off days, not weekly things.',[sSwitch(evSpecial(ev),function(v){ev.special=v;sv();})]));
       var lcBox=el('div',{style:'flex:1;min-width:240px'});
       (function drawLoc(){
@@ -3318,6 +3358,21 @@
   function defaultLead(ev){var r=rep_(ev);return (r==='daily'||r==='weekly')?1:(r==='monthly'?3:cfg.eventLead);}
   function evLead(ev){return ev.lead!=null&&ev.lead!==''?+ev.lead:defaultLead(ev);}
   function evSpecial(ev){if(ev.special!=null)return !!ev.special;var r=rep_(ev);return r==='none'||r==='yearly'||r==='birthday';}
+  function gcalLink(ev){ // Google Calendar "add event" link for leaving, with the event's repeats
+    var p2=function(n){return String(n).padStart(2,'0');},first=nextOccurrence(ev,today0())||parseD(ev.date);
+    var lp=ev.leave.split(':'),st=new Date(first.getFullYear(),first.getMonth(),first.getDate(),+lp[0],+lp[1]),en=new Date(st.getTime()+15*60000);
+    var f=function(d){return d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'T'+p2(d.getHours())+p2(d.getMinutes())+'00';};
+    var r=rep_(ev),n=evEvery(ev),rule='',BD=['SU','MO','TU','WE','TH','FR','SA'];
+    if(r==='daily')rule='FREQ=DAILY;INTERVAL='+n;
+    else if(r==='weekly')rule='FREQ=WEEKLY;INTERVAL='+n+';BYDAY='+((ev.wdays&&ev.wdays.length)?ev.wdays:[parseD(ev.date).getDay()]).map(function(x){return BD[x];}).join(',');
+    else if(r==='monthly')rule='FREQ=MONTHLY;INTERVAL='+n+(ev.monthMode==='nth'?';BYDAY='+Math.ceil(parseD(ev.date).getDate()/7)+BD[parseD(ev.date).getDay()]:'');
+    else if(r==='yearly'||r==='birthday')rule='FREQ=YEARLY';
+    else if(r==='none'&&ev.end&&ev.end>ev.date)rule='FREQ=DAILY;UNTIL='+ev.end.replace(/-/g,'');
+    if(rule&&r!=='none'&&r!=='birthday'){if(ev.endMode==='on'&&ev.until)rule+=';UNTIL='+ev.until.replace(/-/g,'');else if(ev.endMode==='after'&&ev.count)rule+=';COUNT='+ev.count;}
+    var tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent('Leave for '+(ev.name||'event'))+'&dates='+f(st)+'/'+f(en)+
+      (tz?'&ctz='+encodeURIComponent(tz):'')+'&details='+encodeURIComponent('From Medo. Set the reminder to 30 minutes before if you\'d like a heads-up.')+(rule?'&recur='+encodeURIComponent('RRULE:'+rule):'');
+  }
   function fmtTime(hm){if(!hm)return '';var p=hm.split(':'),h=+p[0];return ((h%12)||12)+(p[1]==='00'?'':':'+p[1])+(h<12?'am':'pm');}
   function sayTime(hm){var p=hm.split(':'),h=+p[0],m=+p[1];return m%5===0?clockPhrase(h,m):(hourWord(h)+' '+m+(h<12?' a m':' p m'));}
   var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

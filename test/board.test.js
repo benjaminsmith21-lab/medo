@@ -135,3 +135,25 @@ test('usage stats: counts when on, nothing at all when switched off',async()=>{
 });
 
 test.after(()=>{setTimeout(()=>process.exit(process.exitCode||0),200);});   // jsdom windows are left open; exit once all tests are done
+
+test('leaving for activities: after school, the runner counts down to the event and the clock names it',async()=>{
+  const t=boot({cfg:c=>{const now=new Date(),hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    for(let i=0;i<7;i++)c.days[i].leave=hm(new Date(now.getTime()-3*3600e3));          // school run already done today
+    c.events=[{id:'n1',emoji:'🏄',name:'Nippers',date:ymd(dayOff(-7)),repeat:'weekly',wdays:[now.getDay()],leave:hm(new Date(now.getTime()+40*60e3))}];}});
+  await wait(300);
+  assert.equal(t.d.getElementById('dest').textContent,'🏄');
+  assert.match(t.d.getElementById('cdLabel').textContent,/^Nippers · .* · 40 min$/);
+  t.d.getElementById('countdown').click();await wait(3500);
+  assert.match(t.d.getElementById('clockLeave').textContent,/Nippers · Leave at/);
+  t.close();
+});
+
+test('calendar link carries the weekly repeat and end date',async()=>{
+  const t=boot({cfg:c=>{c.events=[{id:'n1',emoji:'🏄',name:'Nippers',date:'2026-11-06',repeat:'weekly',wdays:[5],endMode:'on',until:'2027-03-26',leave:'16:00'}];}});
+  await wait(300);t.openSettings('Events');
+  let opened='';t.w.open=u=>{opened=u;};
+  const it=t.d.querySelector('details.item');it.open=true;t.button('Add to Google Calendar',it).click();
+  assert.match(decodeURIComponent(opened),/text=Leave for Nippers/);
+  assert.match(decodeURIComponent(opened),/RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=FR;UNTIL=20270326/);
+  assert.match(opened,/T160000\//);t.close();
+});
