@@ -528,6 +528,16 @@
   @keyframes inPop{0%{opacity:0;transform:translateY(30px) scale(.3)}100%{opacity:1;transform:none}}
   .in-hi{font-size:clamp(24px,4.4vw,40px);font-weight:800;color:#fff;opacity:0;animation:inPop .5s ease-out both;text-align:center;padding:0 20px}
   @media (prefers-reduced-motion:reduce){.in-logo,.in-kid,.in-hi{animation:none;opacity:1}.in-spark{display:none}}
+
+  .storycard{text-align:center}
+  .storylogo{width:min(200px,50vw);height:auto;margin:4px auto 6px;display:block}
+  .storyh{font-size:22px;font-weight:800;margin:6px 0 10px}
+  .storyp{font-size:16px;line-height:1.6;margin:0 auto 10px;max-width:560px;color:#e6e8ff}
+  .storytags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+  .storytags span{background:#3d2f12;color:#ffd96a;border-radius:99px;padding:6px 12px;font-weight:800;font-size:14px}
+  .fbtext,.fbemail{width:100%;box-sizing:border-box;margin-top:10px;font-family:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff}
+  .fbtext{resize:vertical;min-height:96px}
+  .credit{color:#8fb7ff;text-decoration:none;font-weight:700}
 </style>
 </head>
 <body>
@@ -597,7 +607,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · own keypad';
+  var BOARD_VERSION='13 Nov 2026 · about + feedback';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1593,7 +1603,8 @@
     progress:'How each child is going over time, and photos or grown-up OKs to check. It fills in day by day from when the board was first used.',
     weather:'Your town powers "What should I wear?" and the automatic sunscreen quest.',
     sound:'Pick the voice. The natural voice downloads once (about 60 MB) and then works offline.',
-    device:'Install the board as an app, make a backup code, or bring back these tips.'
+    device:'Install the board as an app, make a backup code, or bring back these tips.',
+    about:'The story behind Medo, and a way to send ideas or report a problem. Every message is read.'
   };
   function tipCard(inner,tab){
     if(tipSeen('tab:'+tab)||!TAB_TIPS[tab])return;
@@ -2114,7 +2125,7 @@
 
   // ================= SETTINGS (sectioned layout) =================
   var sTab='children',sQuestView='days',openAvatar=-1,openEvent=null;
-  var S_TABS=[['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['device','📱','This device']];
+  var S_TABS=[['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['device','📱','This device'],['about','💛','About']];
   function sCard(title,desc){var c=el('div',{'class':'scard'});if(title)c.appendChild(el('h3',null,title));if(desc)c.appendChild(el('p',{'class':'desc'},desc));return c;}
   function sField(label,help,controls){
     var f=el('div',{'class':'field'}),l=el('div',{'class':'fl'});l.appendChild(el('b',null,label));if(help)l.appendChild(el('span',null,help));
@@ -2148,7 +2159,7 @@
     });
     sBody.innerHTML='';
     var inner=el('div',{'class':'s-inner'});sBody.appendChild(inner);
-    ({children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,device:setDevice})[sTab](inner);
+    ({children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,device:setDevice,about:setAbout})[sTab](inner);
     tipCard(inner,sTab);
   }
   function sHead(inner,title,sub){inner.appendChild(el('h2',{'class':'stitle'},title));if(sub)inner.appendChild(el('p',{'class':'ssub'},sub));}
@@ -2798,13 +2809,65 @@
     d.appendChild(b);tc.appendChild(d);inner.appendChild(tc);
   }
 
+
+  // ---------- About & feedback ----------
+  // Where feedback goes. Google Form: paste the form's "formResponse" address and the entry ids.
+  // Email: used only if no form is set (opens the parent's email app with the message filled in).
+  var FEEDBACK={form:'',entries:{type:'',message:'',email:'',info:''},email:''};
+  function fbInfo(){return ['Medo '+BOARD_VERSION,devWord(),(navigator.userAgent.match(/(Android [\d.]+|iPhone OS [\d_]+|iPad|Windows NT [\d.]+|Mac OS X [\d_]+)/)||[''])[0],nKids()+' kids',cfg.holidays&&cfg.holidays.country||''].filter(Boolean).join(' · ');}
+  function setAbout(inner){
+    sHead(inner,'About Medo','');
+    var st=sCard();st.classList.add('storycard');
+    var lg=document.getElementById('brand').querySelector('svg').cloneNode(true);lg.setAttribute('class','storylogo');st.appendChild(lg);
+    [['It started with two little words.'],
+     ['When our daughter was tiny, she\'d grab the toothbrush, the shoes, the cereal box, and announce "Me do!" She didn\'t want help. She wanted to do it herself.'],
+     ['Then mornings got busy. "Me do" turned into us reminding: teeth, shoes, bag, teeth again. Nobody enjoyed it.'],
+     ['So we built a board that hands the job back to the kids. They tick off their own quests, hear a cheer for every one, watch the little runner race to the car, and fill their own star jar. We just watch, and say less.'],
+     ['Medo is free. It works offline, keeps everything on your device, and has no ads and no accounts.']
+    ].forEach(function(x,i){st.appendChild(el('p',{'class':i?'storyp':'storyh'},x[0]));});
+    var tags=el('div',{'class':'storytags'});tags.appendChild(el('span',null,'For kids: "I did it myself!"'));tags.appendChild(el('span',null,'For grown-ups: routines they own.'));st.appendChild(tags);
+    inner.appendChild(st);
+    // feedback
+    var fc=sCard('💬 Send feedback','Ideas, bugs, or something your kids loved. It goes straight to the person who makes Medo.');
+    var ftype='idea';
+    fc.appendChild(sField('What kind?','',[sSeg([['idea','💡 An idea'],['bug','🐞 Something\'s wrong'],['love','💛 We love it']],ftype,function(v){ftype=v;})]));
+    var msg=el('textarea',{rows:'4','class':'fbtext',placeholder:'Tell us here…',maxlength:'2000'});fc.appendChild(msg);
+    var em=el('input',{type:'email','class':'fbemail',placeholder:'Your email, only if you\'d like a reply (optional)'});fc.appendChild(em);
+    fc.appendChild(el('p',{'class':'hint'},'Also sent: the app version and device type ('+fbInfo()+'). No names, photos or other details.'));
+    var status=el('p',{'class':'status',style:'display:none'});
+    var send=sBtn('Send','primary',function(){
+      var m=msg.value.trim();if(m.length<3){status.style.display='';status.textContent='Write a few words first.';return;}
+      var label={idea:'Idea',bug:'Problem',love:'Love it'}[ftype];
+      if(FEEDBACK.form&&FEEDBACK.entries.message){
+        if(!navigator.onLine){status.style.display='';status.textContent='You\'re offline. Connect to the internet and try again.';return;}
+        var fd=new URLSearchParams();
+        if(FEEDBACK.entries.type)fd.append(FEEDBACK.entries.type,label);
+        fd.append(FEEDBACK.entries.message,m);
+        if(FEEDBACK.entries.email&&em.value.trim())fd.append(FEEDBACK.entries.email,em.value.trim());
+        if(FEEDBACK.entries.info)fd.append(FEEDBACK.entries.info,fbInfo());
+        send.textContent='Sending…';
+        fetch(FEEDBACK.form,{method:'POST',mode:'no-cors',body:fd}).then(function(){
+          msg.value='';em.value='';send.textContent='Send';status.style.display='';status.textContent='✅ Thank you! Your message has been sent.';
+        }).catch(function(){send.textContent='Send';status.style.display='';status.textContent='Couldn\'t send right now. Check the internet and try again.';});
+      } else if(FEEDBACK.email){
+        location.href='mailto:'+FEEDBACK.email+'?subject='+encodeURIComponent('Medo feedback: '+label)+'&body='+encodeURIComponent(m+'\n\n'+(em.value.trim()?'Reply to: '+em.value.trim()+'\n':'')+'— '+fbInfo());
+        status.style.display='';status.textContent='Your email app should open with the message ready. Press Send there.';
+      } else {status.style.display='';status.textContent='Feedback isn\'t switched on yet. Sorry!';}
+    });
+    var row=el('div',{'class':'row',style:'margin-top:8px'});row.appendChild(send);fc.appendChild(row);fc.appendChild(status);
+    inner.appendChild(fc);
+    // credits
+    var cr=sCard('🙏 Thanks to','Medo is built on free, open services.');
+    [['Weather','Open-Meteo.com (CC BY 4.0)','https://open-meteo.com/'],['Public holidays','Nager.Date','https://date.nager.at/'],['Natural voices','Piper, by the Rhasspy and Open Home projects','https://github.com/rhasspy/piper'],['Lettering','Chewy font (Google Fonts, SIL Open Font License)','https://fonts.google.com/specimen/Chewy']].forEach(function(x){
+      var a=el('a',{href:x[2],target:'_blank',rel:'noopener','class':'credit'},x[1]);cr.appendChild(sField(x[0],'',[a]));
+    });
+    inner.appendChild(cr);
+    inner.appendChild(el('p',{'class':'ssub',style:'text-align:center'},'Medo · version '+BOARD_VERSION));
+  }
+
   // ---------- This device ----------
   function setDevice(inner){
     sHead(inner,'This device','Everything here is saved on this device only. Other families using the link keep their own.');
-    var ab=sCard('👋 About Medo');
-    ab.appendChild(el('p',{'class':'desc'},'Medo is named after what little kids say when they want to do something on their own: "Me do!" The board is built around that feeling: the kids run their own routine, and you get fewer reminders to give.'));
-    ab.appendChild(el('p',{'class':'muted'},'For kids: I did it myself. For grown-ups: routines they own.'));
-    inner.appendChild(ab);
     var ic=sCard('📲 Install as an app');
     if(isInstalled())ic.appendChild(el('p',{'class':'status'},'✅ Installed. It opens full screen from its own icon and works without internet.'));
     else{
