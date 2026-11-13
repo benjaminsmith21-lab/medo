@@ -596,6 +596,11 @@
   .pkcal button{height:46px;font-size:17px}.pkcal button.today{box-shadow:inset 0 0 0 2px #ffd23f}.pkcal button:disabled{opacity:.3;cursor:default}
   .pkfoot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
   @media (max-width:480px){.pkgrid{grid-template-columns:repeat(4,1fr)}}
+
+  .qgroup td.qcount{text-align:center;font-size:14px;font-weight:800;color:var(--muted)}.qgroup td.qcount.over{color:#ffb84d}
+  .loadnotes{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+  .loadnote{display:flex;gap:12px;align-items:flex-start;background:#2d2a12;border:2px solid #6b5a12;border-radius:16px;padding:12px 14px}
+  .loadnote b{color:#fff1b8;font-size:15px}.loadnote p{margin:4px 0 8px;font-size:14px;line-height:1.45;color:#fff1b8}.loadi{font-size:22px;line-height:1}
 </style>
 </head>
 <body>
@@ -665,7 +670,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · own time + date pickers';
+  var BOARD_VERSION='14 Nov 2026 · routine length tips';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2562,6 +2567,32 @@
     container.addEventListener('click',function(e){if(e.target.closest('.grip'))e.preventDefault();},true);
   }
   function grip(){return el('span',{'class':'grip',title:'Drag to reorder','aria-label':'Drag to reorder'},'⠿');}
+  // ----- routine length: a gentle note when a routine gets long for the child's age -----
+  function kidAge(kd){if(!kd.birthday)return null;var b=parseD(kd.birthday),t=today0(),a=t.getFullYear()-b.getFullYear();if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))a--;return a>=0&&a<20?a:null;}
+  function questLimit(kd){var a=kidAge(kd);return a==null?8:a<=4?6:a<=7?8:10;}
+  function questCount(d,k,per){var ids=cfg.days[d].kids[k]||[];return cfg.steps.filter(function(s){return stepPeriod(s)===per&&ids.indexOf(s.id)>-1;}).length;}
+  function loadNotes(box){
+    box.innerHTML='';
+    cfg.kids.forEach(function(kd,k){
+      if(kd.noLoadNote)return;
+      var lim=questLimit(kd),age=kidAge(kd);
+      [['am','morning'],['pm','afternoon']].forEach(function(per){
+        var over=[1,2,3,4,5,6,0].filter(function(d){return questCount(d,k,per[0])>lim;});
+        if(!over.length)return;
+        var most=Math.max.apply(null,over.map(function(d){return questCount(d,k,per[0]);}));
+        var n=el('div',{'class':'loadnote'});
+        n.appendChild(el('span',{'class':'loadi'},'💡'));
+        var t=el('div',{style:'flex:1;min-width:0'});
+        var when=over.length===7?'every day':(over.length===5&&over.indexOf(0)<0&&over.indexOf(6)<0)?'on weekdays':'on '+over.map(function(d){return SHORT[d];}).join(', ');
+        t.appendChild(el('b',null,kd.emoji+' '+kd.name+' has up to '+most+' '+per[1]+' quests '+when));
+        t.appendChild(el('p',null,'Around '+lim+' or fewer suits most '+(age!=null?age+'-year-olds':'kids this age')+'. Long lists can feel like too much, and the morning turns back into reminders. You know '+kd.name+' best, so this is just a heads-up.'));
+        var acts=el('div',{'class':'row'});
+        if(kd.mode!=='nownext')acts.appendChild(sBtn('Show one at a time for '+kd.name,'',function(){kd.mode='nownext';sv();render();loadNotes(box);}));
+        acts.appendChild(sBtn('Don\'t show again for '+kd.name,'',function(){kd.noLoadNote=true;sv();loadNotes(box);}));
+        t.appendChild(acts);n.appendChild(t);box.appendChild(n);
+      });
+    });
+  }
   function setQuestDays(inner){
     var dayCard=sCard();
     var order=[1,2,3,4,5,6,0],td=new Date().getDay();
@@ -2573,7 +2604,9 @@
     cfg.kids.forEach(function(kd){var th=el('th');th.appendChild(el('div',{'class':'qav'},kd.emoji));th.appendChild(el('div',{'class':'qnm'},kd.name));thead.appendChild(th);});
     tbl.appendChild(thead);
     [['am','🌅 Morning'],['pm','☀️ Afternoon']].forEach(function(per){
-      var gh=el('tbody');var gr=el('tr',{'class':'qgroup'});gr.appendChild(el('td',{colspan:String(nKids()+1)},per[1]));gh.appendChild(gr);tbl.appendChild(gh);
+      var gh=el('tbody');var gr=el('tr',{'class':'qgroup'});gr.appendChild(el('td',null,per[1]));
+      cfg.kids.forEach(function(kd,k){var c=el('td',{'class':'qcount','data-k':String(k),'data-per':per[0]});gr.appendChild(c);});
+      gh.appendChild(gr);tbl.appendChild(gh);
       var tb=el('tbody');tbl.appendChild(tb);
       makeSortable(tb,'tr',function(ids){reorderPeriod(per[0],ids);});
       cfg.steps.filter(function(s){return stepPeriod(s)===per[0];}).forEach(function(s){
@@ -2582,14 +2615,20 @@
           var on=day.kids[k].indexOf(s.id)>-1;
           var b=el('button',{'class':'qpill'+(on?' on':''),'aria-label':kd.name+': '+s.label},on?'✓':'');
           b.addEventListener('click',function(){var a=day.kids[k],i=a.indexOf(s.id);if(i>-1)a.splice(i,1);else a.push(s.id);sv();
-            var now=a.indexOf(s.id)>-1;b.classList.toggle('on',now);b.textContent=now?'✓':'';});
+            var now=a.indexOf(s.id)>-1;b.classList.toggle('on',now);b.textContent=now?'✓':'';refreshCounts();});
           var tdc=el('td');tdc.appendChild(b);tr.appendChild(tdc);
         });
         tb.appendChild(tr);
       });
     });
     dayCard.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Drag ⠿ to change the order quests appear on the board.'));
-    var wrap=el('div',{'class':'qwrap'});wrap.appendChild(tbl);dayCard.appendChild(wrap);
+    var notes=el('div',{'class':'loadnotes'});
+    function refreshCounts(){
+      [].forEach.call(tbl.querySelectorAll('.qcount'),function(c){var k=+c.dataset.k,kd=cfg.kids[k],n=questCount(sDay,k,c.dataset.per),over=n>questLimit(kd)&&!kd.noLoadNote;
+        c.textContent=n+(over?' ⚠️':'');c.classList.toggle('over',over);c.title=over?'More than '+questLimit(kd)+' can be a lot for '+kd.name:'';});
+      loadNotes(notes);
+    }
+    var wrap=el('div',{'class':'qwrap'});wrap.appendChild(tbl);dayCard.appendChild(wrap);dayCard.appendChild(notes);refreshCounts();
     var copy=el('div',{'class':'row',style:'margin-top:12px'});
     copy.appendChild(el('span',{'class':'muted'},'Copy '+DAYS[sDay]+' to:'));
     copy.appendChild(sBtn('All weekdays','',function(e){[1,2,3,4,5].forEach(function(d){if(d!==sDay)cfg.days[d]=JSON.parse(JSON.stringify(cfg.days[sDay]));});sv();e.target.textContent='Copied ✓';}));
@@ -2982,6 +3021,25 @@
     pTip.style.left=x+'px';pTip.style.top=(y<10?e.clientY+18:y)+'px';
   }
   function hideTip(){if(pTip)pTip.style.display='none';}
+  // Spot a routine that rarely gets finished, from what actually happened (last 10 days that had that routine)
+  function routineInsight(kd){
+    var out=[];
+    [['am','morning'],['pm','afternoon']].forEach(function(per){
+      var seen=0,fin=0,sizes=[];
+      for(var i=1;i<=40&&seen<10;i++){
+        var r=histRec(ymd(addDays(today0(),-i)),kd.id);if(!r)continue;var ids=r[per[0]]||[];if(!ids.length)continue;
+        seen++;sizes.push(ids.length);if(ids.every(function(id){return r.done.indexOf(id)>-1;}))fin++;
+      }
+      if(seen<6||fin/seen>0.4)return;
+      var avg=Math.round(sizes.reduce(function(a,b){return a+b;},0)/sizes.length),lim=questLimit(kd);
+      var n=el('div',{'class':'loadnote'});n.appendChild(el('span',{'class':'loadi'},'💡'));
+      var t=el('div',{style:'flex:1;min-width:0'});
+      t.appendChild(el('b',null,kd.name+' finished their '+per[1]+' on '+fin+' of the last '+seen+' days'));
+      t.appendChild(el('p',null,(avg>lim?'With about '+avg+' quests, the '+per[1]+' routine might be too long. Try dropping one they now do without thinking, or moving one to another part of the day.':'The '+per[1]+' routine has about '+avg+' quests. If one keeps getting skipped (see "Quest by quest" below), try a smaller step or a different picture.')+(kd.mode!=='nownext'?' One-at-a-time mode can also help.':'')));
+      n.appendChild(t);out.push(n);
+    });
+    return out;
+  }
   function setProgress(inner){
     sHead(inner,'Progress','How each child is going over time. Tap a square for that day\'s details.');
     inner.appendChild(sSeg([['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days']],String(sRange),function(v){sRange=+v;renderSettings();}));
@@ -2993,6 +3051,7 @@
     cfg.kids.forEach(function(kd,k){
       var c=sCard();kidColour(c,k);
       var hd=el('div',{'class':'phead'});hd.appendChild(el('span',{'class':'pav'},kd.emoji));hd.appendChild(el('span',{'class':'pname'},kd.name));c.appendChild(hd);
+      routineInsight(kd).forEach(function(n){c.appendChild(n);});
       var tot=0,dn=0,full=0,stars=0,reads=0,days=0,amT=0,amD=0,pmT=0,pmD=0,per={};
       for(var x=new Date(from);x<=t;x=addDays(x,1)){
         var r=histRec(ymd(x),kd.id);if(!r)continue;var st=recStats(r);if(!st.total)continue;

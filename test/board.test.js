@@ -185,3 +185,24 @@ test('own date picker: birthday picked from the calendar, future dates blocked',
   s2.querySelector('.pknav button[title="Year forward"]').click();for(let i=0;i<7;i++)s2.querySelector('.pknav button[title="Year forward"]').click();
   assert.ok([...s2.querySelectorAll('.pkcal button')].every(b=>b.disabled),'a birthday can\'t be in the future');t.close();
 });
+
+test('routine length: a 4-year-old with 9 morning quests gets a gentle note, with fixes',async()=>{
+  const t=boot({cfg:c=>{const y=new Date().getFullYear()-4;c.kids[1].birthday=y+'-01-01';c.kids[1].mode='grid';
+    ['x1','x2','x3'].forEach(id=>c.steps.push({id,emoji:'⭐',label:'Extra '+id,period:'am'}));
+    const am=c.steps.filter(s=>(s.period||'am')==='am').map(s=>s.id).slice(0,9);for(let d=0;d<7;d++)c.days[d].kids[1]=am.slice();}});
+  await wait(300);t.openSettings('Quests');await wait(50);
+  const note=[...t.d.querySelectorAll('.loadnote')].find(n=>n.textContent.includes('Leo'));
+  assert.ok(note,'note shown');assert.match(note.textContent,/Around 6 or fewer suits most 4-year-olds/);
+  assert.ok(t.d.querySelector('.qcount.over'));
+  t.button('Show one at a time for Leo',note).click();
+  assert.equal(t.cfg().kids[1].mode,'nownext');
+  t.button("Don't show again for Leo").click();
+  assert.ok(![...t.d.querySelectorAll('.loadnote')].some(n=>n.textContent.includes('Leo')));t.close();
+});
+
+test('progress insight: a morning rarely finished is pointed out',async()=>{
+  const hist={};for(let i=1;i<=12;i++){const k=ymd(dayOff(-i));hist[k]={kA:{am:['toilet','dress','breakfast','teeth','hair','shoes','bag','sunscreen','hat'],pm:[],done:i%5===0?['toilet','dress','breakfast','teeth','hair','shoes','bag','sunscreen','hat']:['toilet','dress'],star:false,read:false}};}
+  const t=boot({storage:{qb_hist:hist},cfg:c=>{c.kids[0].birthday=(new Date().getFullYear()-6)+'-01-01';}});await wait(300);t.openSettings('Progress');
+  const n=[...t.d.querySelectorAll('.loadnote')].find(x=>x.textContent.includes('Ava finished their morning'));
+  assert.ok(n);assert.match(n.textContent,/on 2 of the last 10 days/);assert.match(n.textContent,/might be too long/);t.close();
+});
