@@ -554,6 +554,33 @@
   .emogrid button:active{transform:scale(.92)}
   .emogrid .emoi{font-size:32px}.emogrid .emoi .svgicon{width:38px;height:38px}
   .emoother{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #3a4180}
+
+  .gdot{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;border-radius:99px;background:#ff4d6d;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 0 0 3px var(--bg);animation:tpulse 1.4s infinite}
+  .rwwait{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #343b78}.rwwait:first-of-type{border-top:none}
+  .rwwe{font-size:34px;line-height:1;width:44px;text-align:center}.rwwt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rwwt span{font-size:13px;color:var(--muted)}
+  .field.col{flex-direction:column;align-items:stretch;gap:8px}
+  .rwtypes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .rwtype{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:2px solid #343b78;background:#1a1e46;color:#fff;font-family:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer}
+  .rwtype.on{border-color:#ffd23f;background:#3d2f12}.rwti{font-size:22px;line-height:1}
+  .rwideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+  .rwidea{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:2px dashed #3f4690;background:transparent;color:#fff;font-family:inherit;text-align:left;cursor:pointer}
+  .rwidea:hover{border-color:#ffd23f}.rwie{font-size:28px;line-height:1}.rwit{display:flex;flex-direction:column;gap:2px;min-width:0}.rwit b{font-size:15px}.rwit span{font-size:12px;color:var(--muted)}
+  .mjrow{padding:10px 0;border-top:1px solid #343b78}.mjrow:first-of-type{border-top:none}
+  .mjtop{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.mjtop b{font-size:17px}.mjbal{font-size:22px;font-weight:800;color:#5fe39d;flex:1}
+  .mjform{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}.mjlog{font-size:13px;color:var(--muted);margin-top:4px}
+  .numin{font-family:inherit;font-size:16px;padding:8px 10px;border-radius:10px;border:2px solid #444b8a;background:#0e1130;color:#fff}
+  @media (max-width:560px){.rwtypes{grid-template-columns:1fr}}
+
+  .rwcard{flex:none;min-width:150px;display:flex;flex-direction:column;align-items:center;gap:4px;background:#232858;border:none;border-radius:22px;padding:14px 16px;color:#fff;font-family:inherit;cursor:pointer;box-shadow:0 5px 0 #12153a}
+  .rwcard .rwce{font-size:44px;line-height:1}.rwcard b{font-size:18px;text-align:center}.rwcard span:last-child{font-size:13px;color:var(--muted);font-weight:700}
+  .rwcard.waiting{background:#3d2f12;animation:rwglow 1.6s ease-in-out infinite}
+  @keyframes rwglow{50%{box-shadow:0 5px 0 #12153a,0 0 0 4px rgba(255,210,63,.7)}}
+  .trow{padding:6px 4px 8px}.rwcard.waiting span:last-child{color:#ffd96a}
+  .rwcard.jar b{color:#5fe39d;font-size:24px}
+  .rwhist-h{font-size:14px;font-weight:800;color:var(--muted);margin:14px 0 8px}
+  .rwhist{display:flex;flex-wrap:wrap;gap:8px}
+  .rwchip{display:flex;align-items:center;gap:8px;background:#1f2350;border:none;border-radius:99px;padding:6px 14px 6px 8px;color:#fff;font-family:inherit;cursor:pointer}
+  .rwchip span{font-size:22px}.rwchip b{font-size:14px}.rwchip i{font-style:normal;font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -623,7 +650,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · our story 2';
+  var BOARD_VERSION='13 Nov 2026 · rewards + money jar';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1015,6 +1042,7 @@
     document.getElementById('uv').style.display='none'; // UV detail is grown-up info: it lives in the small print and drives sunscreen/hat
     applyTheme();
     renderEvents(showBars);
+    try{var wn=rwWaiting().length,g=document.getElementById('gearBtn'),gd=g.querySelector('.gdot');if(wn&&!gd){gd=el('span',{'class':'gdot'});g.appendChild(gd);}if(gd){if(wn)gd.textContent=String(wn);else gd.remove();}}catch(e){}
     recordToday();
     if(trophOn())for(var tk=0;tk<nKids();tk++)updTrophies(tk);
     if(view>=nKids())view=-1;
@@ -1064,9 +1092,11 @@
     if(hasReading(k))b.appendChild(el('span',{'class':'pill',title:'Days of reading'},'📚 '+(kd.reads.count||0)));
     var rws=rewardsFor(k).filter(function(x){return x.rw.show!==false&&!x.p.finished&&!x.p.weekClaimed;});
     var earned=rws.filter(function(x){return x.p.earned;})[0];
-    if(earned)b.appendChild(el('span',{'class':'pill reward earned',title:earned.rw.prize},'🎁 Reward!'));
-    else if(rws.length){rws.sort(function(a,b){return (b.p.count/b.p.n)-(a.p.count/a.p.n);});var r0=rws[0];
-      b.appendChild(el('span',{'class':'pill reward',title:r0.rw.prize},(r0.rw.emoji||'🎁')+' '+r0.p.count+'/'+r0.p.n));}
+    function tapSay(node,text){node.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();keepAwake();say(text);});return node;}
+    if(earned)b.appendChild(tapSay(el('span',{'class':'pill reward earned',title:rwPrize(earned.rw)},'🎁 Reward!'),'You earned '+rwPrize(earned.rw)+'! Ask a grown-up for it.'));
+    else if(rws.length){rws.sort(function(a,b){return (b.p.count/b.p.n)-(a.p.count/a.p.n);});var r0=rws[0],left=r0.p.n-r0.p.count;
+      b.appendChild(tapSay(el('span',{'class':'pill reward',title:rwPrize(r0.rw)},(r0.rw.kind==='money'?'💰':(r0.rw.emoji||'🎁'))+' '+r0.p.count+'/'+r0.p.n),
+        'You have done '+r0.p.count+' out of '+r0.p.n+'. '+left+' more for '+rwPrize(r0.rw)+'!'));}
     if(trophOn()){
       var tp=el('span',{'class':'pill troph'+(trophUnseen(k)?' new':''),title:'Trophy case'},'🏆 '+trophCount(k));
       tp.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();openTrophies(k);});
@@ -1148,7 +1178,7 @@
   // ================= Rewards (rules) =================
   // "If [child] does [thing] [N] times [timeframe], they get [reward]."
   if(!cfg.rewards)cfg.rewards=[];
-  var RW_TYPES=[['quest','Do a quest'],['allday','Finish every quest for the day'],['mornings','Finish their morning quests'],['stars','Earn stars'],['reading','Do their reading']];
+  var RW_TYPES=[['quest','Do a particular quest','✅'],['allday','Finish every quest for the day','⭐'],['mornings','Finish their morning quests','🌅'],['stars','Earn stars','🌟'],['reading','Do their reading','📚']];
   function rwKids(rw){return (rw.kids&&rw.kids.length?rw.kids:cfg.kids.map(function(x){return x.id;}));}
   function rwSatisfied(rw,r){
     if(!r)return false;var st=recStats(r);
@@ -1178,6 +1208,9 @@
   function rwGive(rw,kid){
     var t=today0();
     rw.given=rw.given||{};(rw.given[kid]=rw.given[kid]||[]).push(today());
+    var kd=cfg.kids.filter(function(x){return x.id===kid;})[0];
+    if(kd){(kd.rewardLog=kd.rewardLog||[]).push({d:today(),emoji:rw.kind==='money'?'💰':(rw.emoji||'🎁'),name:rwPrize(rw)});
+      if(rw.kind==='money'&&rw.amount>0)moneyMove(kd,+rw.amount,rwSummary(rw).replace(/^If they /,'For: '));}
     if(rw.repeat==='once'){rw.done=rw.done||{};rw.done[kid]=true;}
     else if(rw.frame==='week'){rw.claimedWeek=rw.claimedWeek||{};rw.claimedWeek[kid]=ymd(mondayOf(t));}
     else {rw.since=rw.since||{};rw.since[kid]=ymd(addDays(t,1));} // start counting again from tomorrow
@@ -1193,8 +1226,22 @@
   }
   function rewardsFor(k){ // rules that apply to this child, with progress
     var kid=kidId(k);
-    return cfg.rewards.filter(function(rw){return rw.prize&&rwKids(rw).indexOf(kid)>-1;}).map(function(rw){return {rw:rw,p:rwProgress(rw,kid)};});
+    return cfg.rewards.filter(function(rw){return rwPrize(rw)&&rwKids(rw).indexOf(kid)>-1;}).map(function(rw){return {rw:rw,p:rwProgress(rw,kid)};});
   }
+  // ----- money and the record of rewards each child has been given -----
+  var CUR={AU:'AUD',NZ:'NZD',US:'USD',GB:'GBP',CA:'CAD',IE:'EUR',DE:'EUR',FR:'EUR',ES:'EUR',IT:'EUR',NL:'EUR',BE:'EUR',AT:'EUR',FI:'EUR',PT:'EUR',GR:'EUR',LU:'EUR',ZA:'ZAR',SG:'SGD',IN:'INR',JP:'JPY',HK:'HKD',MY:'MYR',PH:'PHP',SE:'SEK',NO:'NOK',DK:'DKK',CH:'CHF',PL:'PLN',BR:'BRL',MX:'MXN',AE:'AED'};
+  function curCode(){return CUR[(cfg.holidays&&cfg.holidays.country)||localeRegion()]||'USD';}
+  function money(n){n=+n||0;try{return new Intl.NumberFormat(navigator.language||'en-AU',{style:'currency',currency:curCode(),currencyDisplay:'narrowSymbol',minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}).format(n);}catch(e){return '$'+n.toFixed(n%1?2:0);}}
+  function rwPrize(rw){return rw.kind==='money'?money(rw.amount||0)+' pocket money':(rw.prize||'');}
+  function kidMoney(kd){if(!kd.money)kd.money={bal:0,log:[]};return kd.money;}
+  function moneyMove(kd,amt,what){var m=kidMoney(kd);m.bal=Math.round((m.bal+amt)*100)/100;if(m.bal<0)m.bal=0;m.log.push({d:today(),amt:amt,what:what});if(m.log.length>200)m.log=m.log.slice(-200);sv();}
+  function rwWaiting(){var out=[];cfg.rewards.forEach(function(rw){if(!rwPrize(rw))return;rwKids(rw).forEach(function(id){var kd=cfg.kids.filter(function(x){return x.id===id;})[0];if(kd&&rwProgress(rw,id).earned)out.push({rw:rw,kd:kd});});});return out;}
+  // build each child's reward record once from rewards already given
+  cfg.kids.forEach(function(kd){
+    if(kd.rewardLog)return;kd.rewardLog=[];
+    (cfg.rewards||[]).forEach(function(rw){((rw.given||{})[kd.id]||[]).forEach(function(d){kd.rewardLog.push({d:d,emoji:rw.kind==='money'?'💰':(rw.emoji||'🎁'),name:rwPrize(rw)});});});
+    kd.rewardLog.sort(function(a,b){return a.d<b.d?-1:1;});
+  });
   function earnedRewardIds(k){return rewardsFor(k).filter(function(x){return x.p.earned;}).map(function(x){return x.rw.id;});}
 
   // ================= Trophy case =================
@@ -1387,6 +1434,33 @@
       tile.addEventListener('click',function(){showDetail({month:id.slice(2)});});mrow.appendChild(tile);
     });
     ms.appendChild(mrow);box.appendChild(ms);
+    // my rewards: waiting, money jar, and everything earned so far
+    var waitMine=rwWaiting().filter(function(x){return x.kd.id===kd.id;}),log=(kd.rewardLog||[]).slice().reverse(),mj=kidMoney(kd);
+    var usesMoney=cfg.rewards.some(function(r){return r.kind==='money'&&rwKids(r).indexOf(kd.id)>-1;})||mj.log.length;
+    if(waitMine.length||log.length||usesMoney||cfg.rewards.length){
+      var rs=el('div',{'class':'tsec'});rs.appendChild(el('h3',null,'🎁 My rewards'));
+      var rrow=el('div',{'class':'trow'});
+      waitMine.forEach(function(x){
+        var t=el('button',{'class':'rwcard waiting'});t.appendChild(el('span',{'class':'rwce'},x.rw.kind==='money'?'💰':(x.rw.emoji||'🎁')));
+        t.appendChild(el('b',null,rwPrize(x.rw)));t.appendChild(el('span',null,'Ask a grown-up!'));
+        t.addEventListener('click',function(){bumpIdle();say('You earned '+rwPrize(x.rw)+'! Go and tell a grown-up!');});rrow.appendChild(t);
+      });
+      if(usesMoney){
+        var jar=el('button',{'class':'rwcard jar'});jar.appendChild(el('span',{'class':'rwce'},'💰'));jar.appendChild(el('b',null,money(mj.bal)));jar.appendChild(el('span',null,'in my money jar'));
+        jar.addEventListener('click',function(){bumpIdle();var last=mj.log[mj.log.length-1];
+          say('You have '+money(mj.bal)+' in your money jar!'+(last?(last.amt>=0?' Last time you got '+money(last.amt)+'.':' Last time you spent '+money(-last.amt)+(last.what&&last.what!=='Spent'?' on '+last.what:'')+'.'):''));});
+        rrow.appendChild(jar);
+      }
+      rs.appendChild(rrow);
+      if(log.length){
+        rs.appendChild(el('div',{'class':'rwhist-h'},'Rewards I\'ve earned · '+log.length));
+        var hl=el('div',{'class':'rwhist'});
+        log.slice(0,30).forEach(function(x){var c=el('button',{'class':'rwchip'});c.appendChild(el('span',null,x.emoji));c.appendChild(el('b',null,x.name));c.appendChild(el('i',null,fmtDay(x.d).replace(/ \d{4}$/,'')));
+          c.addEventListener('click',function(){bumpIdle();say('You earned '+x.name+' on '+fmtDay(x.d).replace(/ \d{4}$/,'')+'!');});hl.appendChild(c);});
+        rs.appendChild(hl);
+      } else if(!waitMine.length)rs.appendChild(el('p',{'class':'tts',style:'margin:6px 0 0'},'Your rewards will show up here.'));
+      box.appendChild(rs);
+    }
     // main badges
     var bs=el('div',{'class':'tsec'});bs.appendChild(el('h3',null,'Badges'));
     var grid=el('div',{'class':'tgrid'});
@@ -1857,10 +1931,10 @@
       save('qb_cfg',cfg);
       recordToday();
       var newRw=rewardsFor(k).filter(function(x){return x.p.earned&&rwBefore.indexOf(x.rw.id)<0;})[0];
-      if(newRw)lines.push('And you earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');
+      if(newRw)lines.push(newRw.rw.kind==='money'?'And you earned '+money(newRw.rw.amount)+' for your money jar! Tell a grown-up!':'And you earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');
       var newB=trophOn()?updTrophies(k).news:[];
       if(newB.length)lines.push('You won a new badge: '+newsTitle(newB[0])+'!'+(newB.length>1?' And '+(newB.length-1)+' more!':'')+' Look in your trophy case.');
-      if(newRw&&!milestone){bigFanfare();confetti(k,['🎁','🎉','⭐','🏆','✨']);showBanner((newRw.rw.emoji||'🎁'),kd.name+' earned: '+newRw.rw.prize+'!');}
+      if(newRw&&!milestone){bigFanfare();confetti(k,['🎁','🎉','⭐','🏆','✨']);showBanner(newRw.rw.kind==='money'?'💰':(newRw.rw.emoji||'🎁'),kd.name+' earned: '+rwPrize(newRw.rw)+'!');}
       else if(milestone){bigFanfare();confetti(k,['📚','🏆','⭐','🎉','✨']);showBanner('📚 '+milestone+'!',kd.name+' — '+milestone+' days of reading!');}
       else if(newB.length){badgeSound();var nb=newB[0];
         confetti(k,['🏆','🏅','✨','⭐','🎖️']);
@@ -2133,7 +2207,7 @@
   // ---------- settings ----------
   var sDay=new Date().getDay();
   var sBody=document.getElementById('sBody');
-  function openSettings(){sDay=new Date().getDay();renderSettings();document.getElementById('settings').classList.add('open');}
+  function openSettings(){sDay=new Date().getDay();if(rwWaiting().length)sTab='rewards';renderSettings();document.getElementById('settings').classList.add('open');}
   document.getElementById('closeSettings').addEventListener('click',function(){
     save('qb_cfg',cfg);document.getElementById('settings').classList.remove('open');render();renderWx();
   });
@@ -2610,27 +2684,37 @@
     sHead(inner,'Rewards','Set up rules like "If Ava brushes her teeth 10 times, she gets a sticker." The board counts it for you and celebrates when it\'s earned.');
     var kidOf=function(id){return cfg.kids.filter(function(x){return x.id===id;})[0];};
     // anything waiting to be handed over goes first
-    var waiting=[];
-    cfg.rewards.forEach(function(rw){rwKids(rw).forEach(function(id){var kd=kidOf(id);if(kd&&rw.prize&&rwProgress(rw,id).earned)waiting.push([rw,kd]);});});
+    var waiting=rwWaiting();
     if(waiting.length){
-      var wc=sCard('🎁 Ready to hand over','Tap "Given" once they have it. The count then starts again (or the reward finishes, if it\'s one-time only).');
+      var wc=sCard('🎁 Ready to hand over','Tap "Given" once they have it. Money goes into their money jar.');
       waiting.forEach(function(x){
-        wc.appendChild(sField(x[1].emoji+' '+x[1].name+' earned '+(x[0].emoji||'🎁')+' '+x[0].prize,rwSummary(x[0]),[sBtn('Given ✓','primary',function(){rwGive(x[0],x[1].id);renderSettings();render();})]));
+        var row=el('div',{'class':'rwwait'});row.appendChild(el('span',{'class':'rwwe'},x.rw.emoji||'🎁'));
+        var t=el('div',{'class':'rwwt'});t.appendChild(el('b',null,x.kd.emoji+' '+x.kd.name+' earned '+rwPrize(x.rw)));t.appendChild(el('span',null,rwSummary(x.rw)));row.appendChild(t);
+        row.appendChild(sBtn('Given ✓','primary',function(){rwGive(x.rw,x.kd.id);renderSettings();render();}));
+        wc.appendChild(row);
       });
       inner.appendChild(wc);
     }
-    var lc=sCard('Your rewards','Tap a reward to edit it.');
+    var lc=sCard('Your rewards','Tap a reward to edit it. Rewards count from the day you create them.');
     cfg.rewards.forEach(function(rw,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
-      sm.appendChild(el('span',{'class':'iic'},rw.emoji||'🎁'));sm.appendChild(el('span',{'class':'iname'},rw.prize||'New reward'));
+      sm.appendChild(el('span',{'class':'iic'},rw.kind==='money'?'💰':(rw.emoji||'🎁')));sm.appendChild(el('span',{'class':'iname'},rwPrize(rw)||'New reward'));
       sm.appendChild(el('span',{'class':'tag'},rwSummary(rw)));
-      if(!rw.prize||openReward===rw.id)d.open=true;
+      if(!rwPrize(rw)||openReward===rw.id)d.open=true;
       d.addEventListener('toggle',function(){if(d.open)openReward=rw.id;else if(openReward===rw.id)openReward=null;});
       d.appendChild(sm);var b=el('div',{'class':'body'});
       function redraw(){openReward=rw.id;sv();renderSettings();}
-      var em=emojiBtn(rw.emoji||'🎁',function(v){rw.emoji=v;sv();render();},'reward',function(){return rw.prize||'';});
-      var pz=el('input',{type:'text',value:rw.prize||'',placeholder:'e.g. Choose what\'s for dinner',style:'flex:1;min-width:180px'});pz.addEventListener('input',function(){rw.prize=pz.value;sv();});
-      b.appendChild(sField('They get','What the reward is.',[em,pz]));
+      // what they get: a treat/thing, or money for their jar
+      b.appendChild(sField('They get','',[sSeg([['treat','🎁 A treat or thing'],['money','💰 Money']],rw.kind==='money'?'money':'treat',function(v){rw.kind=v==='money'?'money':'';if(v==='money'&&!rw.amount)rw.amount=1;redraw();render();})]));
+      if(rw.kind==='money'){
+        var amt=el('input',{type:'number',min:'0',step:'0.5',value:String(rw.amount||1),style:'width:110px','class':'numin'});
+        amt.addEventListener('change',function(){var v=parseFloat(amt.value);if(!isNaN(v)&&v>=0){rw.amount=Math.round(v*100)/100;redraw();render();}});
+        b.appendChild(sField('How much','Added to their money jar when you tap "Given".',[el('span',{'class':'muted'},curCode()),amt]));
+      } else {
+        var em=emojiBtn(rw.emoji||'🎁',function(v){rw.emoji=v;sv();render();},'reward',function(){return rw.prize||'';});
+        var pz=el('input',{type:'text',value:rw.prize||'',placeholder:'e.g. Choose what\'s for dinner',style:'flex:1;min-width:180px'});pz.addEventListener('input',function(){rw.prize=pz.value;sv();});
+        b.appendChild(sField('Reward','',[em,pz]));
+      }
       var who=el('div',{'class':'chips'});
       cfg.kids.forEach(function(kd){
         var on=!rw.kids||!rw.kids.length||rw.kids.indexOf(kd.id)>-1;
@@ -2640,7 +2724,11 @@
         who.appendChild(c);
       });
       b.appendChild(sField('Who','Each child counts separately.',[who]));
-      b.appendChild(sField('If they…',null,[sSeg(RW_TYPES,rw.type||'quest',function(v){rw.type=v;redraw();})]));
+      // "If they…" as a tidy grid of tiles
+      var tg=el('div',{'class':'rwtypes'});
+      RW_TYPES.forEach(function(t){var on=(rw.type||'quest')===t[0];var bt=el('button',{'class':'rwtype'+(on?' on':'')});bt.appendChild(el('span',{'class':'rwti'},t[2]));bt.appendChild(el('span',null,t[1]));
+        bt.addEventListener('click',function(){rw.type=t[0];redraw();});tg.appendChild(bt);});
+      var tf=el('div',{'class':'field col'});tf.appendChild(el('div',{'class':'fl'})).appendChild(el('b',null,'If they…'));tf.appendChild(tg);b.appendChild(tf);
       if((rw.type||'quest')==='quest'){
         var qs=el('select');cfg.steps.forEach(function(st){var o=el('option',{value:st.id},(/^svg:/.test(st.emoji)?'':st.emoji+' ')+st.label);if(rw.quest===st.id)o.selected=true;qs.appendChild(o);});
         if(!rw.quest&&cfg.steps[0]){rw.quest=cfg.steps[0].id;}
@@ -2650,9 +2738,8 @@
       b.appendChild(sField(rw.frame==='row'?'How many days':'How many times',null,[sNum(+rw.n||5,1,function(v){rw.n=v;redraw();},80)]));
       b.appendChild(sField('Counting',{since:'Adds up over time. Starts again after you mark it as given.',week:'Has to happen within one week (Monday to Sunday). Starts fresh each Monday.',row:'Days in a row. Missing a day starts it again.'}[rw.frame||'since'],
         [sSeg([['since','Over time'],['week','In one week'],['row','In a row']],rw.frame||'since',function(v){rw.frame=v;redraw();})]));
-      b.appendChild(sField('Repeats',null,[sSeg([['every','Every time it\'s earned'],['once','One time only']],rw.repeat||'every',function(v){rw.repeat=v;redraw();})]));
-      b.appendChild(sField('Show progress on the board','e.g. "🎁 3/5" on their card. Seeing it grow keeps kids keen.',[sSwitch(rw.show!==false,function(v){rw.show=v;sv();})]));
-      b.appendChild(el('p',{'class':'status'},'🏆 '+(rw.prize?rw.prize+': ':'')+rwSummary(rw)+'.'));
+      b.appendChild(sField('Repeats',null,[sSeg([['every','Every time'],['once','Just once']],rw.repeat||'every',function(v){rw.repeat=v;redraw();})]));
+      b.appendChild(sField('Show progress on their card','e.g. "🎁 3/5". Seeing it grow keeps kids keen.',[sSwitch(rw.show!==false,function(v){rw.show=v;sv();})]));
       rwKids(rw).forEach(function(id){
         var kd=kidOf(id);if(!kd)return;var pr=rwProgress(rw,id);
         var bar=el('div',{'class':'pbar'});var fill=el('div',{'class':'pfill'});fill.style.width=Math.round(pr.count/pr.n*100)+'%';bar.appendChild(fill);
@@ -2666,17 +2753,41 @@
       acts.appendChild(sConfirm('Delete reward','Tap again to delete','linkbtn',function(){cfg.rewards.splice(idx,1);sv();renderSettings();render();}));
       b.appendChild(acts);d.appendChild(b);lc.appendChild(d);
     });
-    if(!cfg.rewards.length)lc.appendChild(el('p',{'class':'muted'},'No rewards yet. Start with one of the ideas below.'));
+    if(!cfg.rewards.length)lc.appendChild(el('p',{'class':'muted'},'No rewards yet. Start from an idea below, or make your own.'));
     var adds=el('div',{'class':'row',style:'margin-top:10px'});
     adds.appendChild(sBtn('+ New reward','primary',function(){var r={id:'r'+Date.now(),emoji:'🎁',prize:'',kids:[],type:'quest',quest:'teeth',n:10,frame:'since',repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();}));
     lc.appendChild(adds);
-    var ideas=el('div',{'class':'row',style:'margin-top:4px'});ideas.appendChild(el('span',{'class':'muted'},'Ideas:'));
-    [['🍕','Choose what\'s for dinner','allday',5,'week'],['🏞️','Trip to the park','stars',10,'since'],['📕','A new book','reading',20,'since'],['🦷','Sticker','quest',7,'row','teeth'],['🎬','Movie night','mornings',5,'week']].forEach(function(x){
-      ideas.appendChild(sBtn(x[0]+' '+x[1],'',function(){var r={id:'r'+Date.now(),emoji:x[0],prize:x[1],kids:[],type:x[2],quest:x[5]||'',n:x[3],frame:x[4],repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();render();}));
+    lc.appendChild(el('div',{'class':'emocat',style:'margin-top:16px'},'Or start from an idea'));
+    var ideas=el('div',{'class':'rwideas'});
+    [['🍕','Choose what\'s for dinner','allday',5,'week','','Finish every quest 5 days in a week'],['💰','Pocket money','allday',5,'week','','Finish every quest 5 days in a week',1],
+     ['🏞️','Trip to the park','stars',10,'since','','Earn 10 stars'],['📕','A new book','reading',20,'since','','Read on 20 days'],
+     ['🦷','Sticker','quest',7,'row','teeth','Brush teeth 7 days in a row'],['🎬','Movie night','mornings',5,'week','','Finish mornings 5 days in a week']].forEach(function(x){
+      var c=el('button',{'class':'rwidea'});c.appendChild(el('span',{'class':'rwie'},x[0]));var t=el('span',{'class':'rwit'});t.appendChild(el('b',null,x[1]));t.appendChild(el('span',null,x[6]));c.appendChild(t);
+      c.addEventListener('click',function(){var r={id:'r'+Date.now(),emoji:x[0],prize:x[7]?'':x[1],kind:x[7]?'money':'',amount:x[7]||0,kids:[],type:x[2],quest:x[5]||'',n:x[3],frame:x[4],repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();render();});
+      ideas.appendChild(c);
     });
     lc.appendChild(ideas);
     inner.appendChild(lc);
-    inner.appendChild(el('p',{'class':'ssub'},'Rewards count from the day you create them, using what the board records each day.'));
+    // money jars
+    var mc=sCard('💰 Money jars','Money rewards add up here. When they spend some (an ice block at school, a toy), take it out so the jar stays right. No real money goes through the app.');
+    cfg.kids.forEach(function(kd){
+      var mj=kidMoney(kd);
+      var row=el('div',{'class':'mjrow'});
+      var top=el('div',{'class':'mjtop'});top.appendChild(el('b',null,kd.emoji+' '+kd.name));top.appendChild(el('span',{'class':'mjbal'},money(mj.bal)));
+      var form=el('div',{'class':'mjform'});form.style.display='none';
+      var mode='spend';
+      var a=el('input',{type:'number',min:'0',step:'0.5',placeholder:'0.00','class':'numin',style:'width:110px'});
+      var note=el('input',{type:'text',placeholder:'What for? (optional)',maxlength:'40',style:'flex:1;min-width:140px'});
+      var ok=sBtn('Save','primary',function(){var v=parseFloat(a.value);if(isNaN(v)||v<=0)return;moneyMove(kd,mode==='spend'?-v:v,note.value.trim()||(mode==='spend'?'Spent':'Added by a grown-up'));renderSettings();});
+      form.appendChild(el('span',{'class':'muted'},curCode()));form.appendChild(a);form.appendChild(note);form.appendChild(ok);
+      var bs=el('div',{'class':'row'});
+      bs.appendChild(sBtn('− Spend','',function(){mode='spend';form.style.display='';a.focus();}));
+      bs.appendChild(sBtn('+ Add','',function(){mode='add';form.style.display='';a.focus();}));
+      top.appendChild(bs);row.appendChild(top);row.appendChild(form);
+      mj.log.slice(-3).reverse().forEach(function(x){row.appendChild(el('div',{'class':'mjlog'},(x.amt>=0?'+':'−')+money(Math.abs(x.amt))+' · '+x.what+' · '+fmtDate(x.d).replace(/ \d{4}$/,'')));});
+      mc.appendChild(row);
+    });
+    inner.appendChild(mc);
     // trophy case
     var tc=sCard('🏆 Trophy case','Badges the board gives out by itself: Bronze → Silver → Gold → Diamond → Legend, a new challenge every month, and secret badges to discover. Kids tap 🏆 on their card to see them.');
     tc.appendChild(sField('Show the trophy case','',[sSwitch(trophOn(),function(v){cfg.trophies=v;sv();render();renderSettings();})]));
