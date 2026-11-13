@@ -206,3 +206,44 @@ test('progress insight: a morning rarely finished is pointed out',async()=>{
   const n=[...t.d.querySelectorAll('.loadnote')].find(x=>x.textContent.includes('Ava finished their morning'));
   assert.ok(n);assert.match(n.textContent,/on 2 of the last 10 days/);assert.match(n.textContent,/might be too long/);t.close();
 });
+
+test('voice message: plays after the cheer when a child finishes the day, once only',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.arvoStart='00:00';c.messages=[{id:'m1',from:{name:'Nana',emoji:'👵'},kids:['kA'],when:'day',repeat:'once',created:'2026-11-01',played:{}}];},
+    storage:{qb_prog:{date:ymd(new Date()),done:[['toilet','dress','breakfast','teeth','hair','shoes'],[]],celebrated:{am:[true,false],pm:[]}}}});
+  await t.putAudio('msg|m1','data:audio/webm;base64,AAAA');await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  while(t.d.querySelector('.tile:not(.done)'))t.d.querySelector('.tile:not(.done)').click();
+  await wait(400);
+  assert.deepEqual(t.played,['data:audio/webm;base64,AAAA']);
+  assert.equal(t.cfg().messages[0].played.kA.length,1);
+  assert.ok([...t.d.querySelectorAll('.mile')].some(x=>/A message from Nana!/.test(x.textContent)));t.close();
+});
+
+test('voice message on a date plays by itself when the board is on',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m2',from:{name:'Pop',emoji:'👴'},kids:[],when:'date',date:ymd(new Date()),repeat:'once',created:'2026-11-01',played:{}}];}});
+  await t.putAudio('msg|m2','data:audio/webm;base64,BBBB');await wait(4600);
+  assert.deepEqual(t.played,['data:audio/webm;base64,BBBB']);
+  const m=t.cfg().messages[0];assert.ok(m.played.kA&&m.played.kB,'counted as heard by both kids');t.close();
+});
+
+test('messages tab lists messages; kids can replay heard ones from the trophy case',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m3',from:{name:'Nana',emoji:'👵'},kids:['kA'],when:'surprise',repeat:'every',created:'2026-11-01',played:{kA:['2026-11-10']}}];}});
+  await t.putAudio('msg|m3','data:audio/webm;base64,CCCC');await wait(300);
+  t.d.querySelector('.pill.troph').click();
+  const card=[...t.d.querySelectorAll('.tsec')].find(x=>x.textContent.includes('My messages'));assert.ok(card);
+  card.querySelector('.rwcard').click();await wait(200);
+  assert.deepEqual(t.played,['data:audio/webm;base64,CCCC']);
+  t.d.querySelector('.tclose').click();t.openSettings('Messages');
+  assert.match(t.d.querySelector('details.item').textContent,/From Nana/);
+  assert.ok(t.button('Record a new message'));t.close();
+});
+
+test('no wifi: the weather card says so plainly instead of sounding broken',async()=>{
+  const t=boot({storage:{qb_wx:{date:'2000-01-01'}}});
+  Object.defineProperty(t.w.navigator,'onLine',{value:false,configurable:true});
+  await wait(400);t.w.dispatchEvent(new t.w.Event('offline'));
+  assert.match(t.d.getElementById('wxTitle').textContent,/No internet right now/);
+  assert.match(t.d.getElementById('wxSub').textContent,/back on wifi/);
+  t.d.getElementById('wx').click();await wait(200);
+  assert.match(t.lastSaid(),/need the internet to check the weather/);t.close();
+});

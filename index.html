@@ -601,6 +601,14 @@
   .loadnotes{display:flex;flex-direction:column;gap:10px;margin-top:12px}
   .loadnote{display:flex;gap:12px;align-items:flex-start;background:#2d2a12;border:2px solid #6b5a12;border-radius:16px;padding:12px 14px}
   .loadnote b{color:#fff1b8;font-size:15px}.loadnote p{margin:4px 0 8px;font-size:14px;line-height:1.45;color:#fff1b8}.loadi{font-size:22px;line-height:1}
+
+  .reccard{text-align:center}
+  .recbig{display:flex;justify-content:center;margin:10px 0}
+  .recbtn{width:120px;height:120px;border-radius:50%;border:8px solid #fff;background:#ff4d6d;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.35)}
+  .recbtn.on{border-radius:28px;background:#ff4d6d;animation:recpulse 1.2s ease-in-out infinite}
+  @keyframes recpulse{50%{box-shadow:0 6px 0 rgba(0,0,0,.35),0 0 0 14px rgba(255,77,109,.3)}}
+  .rectime{text-align:center;font-size:24px;font-weight:800;color:#ffd96a}
+  .reclvl{height:10px;border-radius:99px;background:#12153a;overflow:hidden;margin:10px auto;max-width:300px}.reclvlf{height:100%;width:0;background:#5fe39d;border-radius:99px;transition:width .08s}
 </style>
 </head>
 <body>
@@ -670,7 +678,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · routine length tips';
+  var BOARD_VERSION='14 Nov 2026 · voice messages + clearer offline';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1481,6 +1489,15 @@
       } else if(!waitMine.length)rs.appendChild(el('p',{'class':'tts',style:'margin:6px 0 0'},'Your rewards will show up here.'));
       box.appendChild(rs);
     }
+    // messages they've heard, to replay
+    var myMsgs=cfg.messages.filter(function(m){return ((m.played||{})[kd.id]||[]).length;});
+    if(myMsgs.length){
+      var mb=el('div',{'class':'tsec'});mb.appendChild(el('h3',null,'💌 My messages'));
+      var mr=el('div',{'class':'trow'});
+      myMsgs.forEach(function(m){var c=el('button',{'class':'rwcard'});c.appendChild(el('span',{'class':'rwce'},m.from.emoji||'💌'));c.appendChild(el('b',null,'From '+(m.from.name||'someone')));c.appendChild(el('span',null,'Tap to listen'));
+        c.addEventListener('click',function(){bumpIdle();playMsg(m,null);});mr.appendChild(c);});
+      mb.appendChild(mr);box.appendChild(mb);
+    }
     // main badges
     var bs=el('div',{'class':'tsec'});bs.appendChild(el('h3',null,'Badges'));
     var grid=el('div',{'class':'tgrid'});
@@ -1740,6 +1757,7 @@
     weather:'Your town powers "What should I wear?" and the automatic sunscreen quest.',
     sound:'Pick the voice. The natural voice downloads once (about 60 MB) and then works offline.',
     device:'Install the board as an app, make a backup code, or bring back these tips.',
+    messages:'Hand the tablet to a grandparent and tap the red button. Their message can play when the kids finish their morning, on a birthday, or as a surprise.',
     about:'The story behind Medo, and a way to send ideas or report a problem. Every message is read.'
   };
   function tipCard(inner,tab){
@@ -1990,7 +2008,8 @@
       else if(big){fanfare();confetti(k);}
       else blip();
       if(!tipSeen('undo:'+kidId(k))){markTip('undo:'+kidId(k));lines.push('Oops, wrong one? Hold your finger on it to undo.');}
-      say(lines.join(' '));
+      var vm=msgAfterTick(k,left===0?per:'',star);
+      say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)]);}:null);
       if(big&&!isSplit()){clearTimeout(idleT);idleT=setTimeout(goHome,milestone||star?8000:6000);}
     }
     save('qb_prog',prog);
@@ -2286,7 +2305,7 @@
 
   // ================= SETTINGS (sectioned layout) =================
   var sTab='children',sQuestView='days',openAvatar=-1,openEvent=null;
-  var S_TABS=[['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['device','📱','This device'],['about','💛','About']];
+  var S_TABS=[['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['messages','💌','Messages'],['device','📱','This device'],['about','💛','About']];
   function sCard(title,desc){var c=el('div',{'class':'scard'});if(title)c.appendChild(el('h3',null,title));if(desc)c.appendChild(el('p',{'class':'desc'},desc));return c;}
   function sField(label,help,controls){
     var f=el('div',{'class':'field'}),l=el('div',{'class':'fl'});l.appendChild(el('b',null,label));if(help)l.appendChild(el('span',null,help));
@@ -2320,7 +2339,7 @@
     });
     sBody.innerHTML='';
     var inner=el('div',{'class':'s-inner'});sBody.appendChild(inner);
-    ({children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,device:setDevice,about:setAbout})[sTab](inner);
+    ({children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,messages:setMessages,device:setDevice,about:setAbout})[sTab](inner);
     tipCard(inner,sTab);
   }
   function sHead(inner,title,sub){inner.appendChild(el('h2',{'class':'stitle'},title));if(sub)inner.appendChild(el('p',{'class':'ssub'},sub));}
@@ -2472,6 +2491,7 @@
       ['Going places',['🏖️','✈️','⛺','🏕️','🚗','🚆','🎡','🏞️','🏫','🏥','🦷']],
       ['Activities',['⚽','🏊','🩰','🎹','🎨','🥋','🏀','🎾','🤸','🧸','🎬','🍕']],
       ['People',['👵','👴','👨‍👩‍👧','🧑‍🤝‍🧑','👶','🐶']]],
+    people:[['Family',['👵','👴','👩','👨','🧑','🧓','👱‍♀️','👱','🧔','👩‍🦳','👨‍🦳','👩‍🦰']],['Fun',['🦸','🧚','🦄','🐻','🐶','🐱','🌟','💌','❤️','🎤']]],
     reward:[['Treats',['🍦','🍕','🍭','🍫','🍩','🧁','🍿']],
       ['Outings',['🏞️','🎬','🎡','🛝','🏊','🚲','🎟️']],
       ['Things',['🎁','📕','🧸','🎮','🎨','🧩','⭐','🏆','💰','🦷']]]
@@ -3226,6 +3246,146 @@
   }
 
 
+  // ================= Voice messages (e.g. from grandparents) =================
+  // Recorded in the app, kept on this device (same store as proof photos, key "msg|id"), played when their moment comes.
+  if(!cfg.messages)cfg.messages=[];
+  var MSG_WHEN=[['am','When they finish their morning','🌅'],['day','When they finish every quest for the day','⭐'],['surprise','A surprise after a quest, now and then','🎁'],['date','On a special date','📅'],['time','At a time each day','🕒']];
+  var msgAudio=null;
+  function photoGet(key,cb){photoDB(function(db){if(!db)return cb(null);try{var rq=db.transaction('p','readonly').objectStore('p').get(key);rq.onsuccess=function(){cb(rq.result?rq.result.url:null);};rq.onerror=function(){cb(null);};}catch(e){cb(null);}});}
+  function msgKids(m){return m.kids&&m.kids.length?m.kids:cfg.kids.map(function(x){return x.id;});}
+  function msgPlayedToday(m,kid){return ((m.played||{})[kid]||[]).indexOf(today())>-1;}
+  function msgUsedUp(m,kid){return m.repeat!=='every'&&((m.played||{})[kid]||[]).length>0;}
+  function msgMark(m,kids){m.played=m.played||{};kids.forEach(function(id){(m.played[id]=m.played[id]||[]).push(today());});sv();}
+  function playMsg(m,kids,after){
+    photoGet('msg|'+m.id,function(url){
+      if(!url){if(kids)msgMark(m,kids);if(after)after(true);return;}   // recording missing (e.g. restored on another device): don't keep retrying
+      stopSpeaking();if(msgAudio){try{msgAudio.pause();}catch(e){}}
+      var a=new Audio(url);msgAudio=a;
+      var p;try{p=a.play();}catch(e){p=null;}
+      function ok(){if(kids)msgMark(m,kids);stats('message-played',m.when);showBanner(m.from.emoji||'💌','A message from '+(m.from.name||'someone')+'!');if(after)after(true);}
+      if(p&&p.then)p.then(ok).catch(function(){if(after)after(false);});else ok();
+    });
+  }
+  // after a tick: finished morning / whole day / surprise
+  function msgAfterTick(k,finishedPer,finishedDay){
+    var kid=kidId(k),pick=null;
+    cfg.messages.forEach(function(m){
+      if(pick||msgKids(m).indexOf(kid)<0||msgUsedUp(m,kid)||msgPlayedToday(m,kid))return;
+      if((m.when==='am'&&finishedPer==='am')||(m.when==='day'&&finishedDay))pick=m;
+    });
+    if(!pick){var sur=cfg.messages.filter(function(m){return m.when==='surprise'&&msgKids(m).indexOf(kid)>-1&&!msgUsedUp(m,kid)&&!msgPlayedToday(m,kid);});
+      if(sur.length&&Math.random()<0.1)pick=sur[Math.floor(Math.random()*sur.length)];}
+    return pick;
+  }
+  // dates and times: play when the moment arrives (or the next time the board is used that day)
+  var msgPending=null;
+  function msgDue(){
+    var now=new Date(),hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    for(var i=0;i<cfg.messages.length;i++){var m=cfg.messages[i];
+      var due=(m.when==='date'&&m.date===today())||(m.when==='time'&&m.time&&m.time<=hm&&m.time>=String(Math.max(0,now.getHours()-3)).padStart(2,'0')+':00');
+      if(!due)continue;
+      var kids=msgKids(m).filter(function(id){return !msgPlayedToday(m,id)&&!msgUsedUp(m,id);});
+      if(kids.length)return {m:m,kids:kids};
+    }
+    return null;
+  }
+  function msgCheck(){
+    if(document.hidden||msgPending)return;
+    var d=msgDue();if(!d)return;
+    msgPending=d;
+    playMsg(d.m,d.kids,function(ok){if(ok){msgPending=null;return;}
+      // the browser wanted a tap first: play on the next touch
+      document.addEventListener('pointerdown',function once(){document.removeEventListener('pointerdown',once,true);var d2=msgPending;msgPending=null;if(d2)playMsg(d2.m,d2.kids);},true);});
+  }
+  setInterval(function(){try{msgCheck();}catch(e){}},30000);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(msgCheck,1500);});
+  setTimeout(function(){try{msgCheck();}catch(e){}},4000);
+  // ---- recorder ----
+  function openRecorder(onKeep){
+    var S=pkSheet('Record a message'),body=S.body,chunks=[],rec=null,stream=null,url=null,timer=null,secs=0,actx=null,raf=0;
+    var big=el('div',{'class':'recbig'}),tm=el('div',{'class':'rectime'},'0:00 / 0:30'),lvl=el('div',{'class':'reclvl'}),bar=el('div',{'class':'reclvlf'});lvl.appendChild(bar);
+    var btn=el('button',{'class':'recbtn',title:'Record'});big.appendChild(btn);body.appendChild(big);body.appendChild(tm);body.appendChild(lvl);
+    var hint=el('p',{'class':'hint',style:'text-align:center'},'Tap the red button and talk. Up to 30 seconds.');body.appendChild(hint);
+    var foot=el('div',{'class':'pkfoot'});body.appendChild(foot);
+    function cleanup(){clearInterval(timer);cancelAnimationFrame(raf);try{if(stream)stream.getTracks().forEach(function(t){t.stop();});}catch(e){}try{if(actx)actx.close();}catch(e){}stream=null;actx=null;}
+    var x=S.ov.querySelector('.tclose');x.addEventListener('click',cleanup);
+    function stop(){if(rec&&rec.state==='recording')rec.stop();}
+    btn.addEventListener('click',function(){
+      if(rec&&rec.state==='recording'){stop();return;}
+      if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)){hint.textContent='This '+devWord()+' can\'t record from the app. Sorry!';return;}
+      navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+        stream=st;chunks=[];secs=0;
+        var mt=['audio/webm;codecs=opus','audio/webm','audio/mp4',''].filter(function(t){return !t||(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t));})[0];
+        rec=mt?new MediaRecorder(st,{mimeType:mt}):new MediaRecorder(st);
+        rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+        rec.onstop=function(){cleanup();btn.classList.remove('on');
+          var blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'});
+          var fr=new FileReader();fr.onload=function(){url=fr.result;review();};fr.readAsDataURL(blob);};
+        rec.start();btn.classList.add('on');hint.textContent='Recording… tap again to stop.';
+        timer=setInterval(function(){secs++;tm.textContent='0:'+String(secs).padStart(2,'0')+' / 0:30';if(secs>=30)stop();},1000);
+        try{actx=new (window.AudioContext||window.webkitAudioContext)();var src=actx.createMediaStreamSource(st),an=actx.createAnalyser();an.fftSize=256;src.connect(an);var buf=new Uint8Array(an.frequencyBinCount);
+          (function loop(){an.getByteFrequencyData(buf);var v=0;for(var i=0;i<buf.length;i++)v+=buf[i];bar.style.width=Math.min(100,v/buf.length*1.6)+'%';raf=requestAnimationFrame(loop);})();}catch(e){}
+      }).catch(function(){hint.textContent='The microphone isn\'t allowed. Allow it in the '+devWord()+'\'s settings for Medo, then try again.';});
+    });
+    function review(){
+      foot.innerHTML='';hint.textContent='How does it sound?';
+      foot.appendChild(sBtn('▶ Listen','',function(){stopSpeaking();var a=new Audio(url);a.play().catch(function(){});}));
+      foot.appendChild(sBtn('Record again','',function(){url=null;foot.innerHTML='';tm.textContent='0:00 / 0:30';hint.textContent='Tap the red button and talk. Up to 30 seconds.';}));
+      foot.appendChild(sBtn('Keep it','primary',function(){S.ov.remove();onKeep(url,secs);}));
+    }
+  }
+  function msgWhenText(m){
+    if(m.when==='date')return 'On '+(m.date?pkDateText(m.date):'a date');
+    if(m.when==='time')return 'Every day at '+(m.time?pkTimeText(m.time):'a time');
+    return (MSG_WHEN.filter(function(x){return x[0]===m.when;})[0]||['','',''])[1];
+  }
+  var openMsg=null;
+  function setMessages(inner){
+    sHead(inner,'Voice messages','Record a message, e.g. from Nana or Pop, and it plays when the moment comes: when they finish, on a special day, or as a surprise.');
+    var nc=sCard();nc.classList.add('reccard');
+    nc.appendChild(sBtn('🎙️ Record a new message','primary big',function(){
+      openRecorder(function(url,secs){
+        var m={id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[],when:'day',repeat:'once',created:today(),secs:secs,played:{}};
+        photoPut('msg|'+m.id,url,function(ok){if(!ok){alertMsg('Couldn\'t save the recording on this '+devWord()+'.');return;}cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();});
+      });
+    }));
+    nc.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Recordings stay on this '+devWord()+' only. They play out loud when Medo is open on the home screen.'));
+    inner.appendChild(nc);
+    var lc=sCard('Messages');
+    if(!cfg.messages.length)lc.appendChild(el('p',{'class':'muted'},'No messages yet. Grandparents visiting? Hand them the '+devWord()+' and tap the red button.'));
+    cfg.messages.forEach(function(m,idx){
+      var d=el('details',{'class':'item'}),sm=el('summary');
+      sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
+      sm.appendChild(el('span',{'class':'tag'},msgWhenText(m)));
+      if(openMsg===m.id||!m.from.name)d.open=true;
+      d.addEventListener('toggle',function(){if(d.open)openMsg=m.id;else if(openMsg===m.id)openMsg=null;});
+      d.appendChild(sm);var b=el('div',{'class':'body'});
+      function redraw(){openMsg=m.id;sv();renderSettings();}
+      var fe=emojiBtn(m.from.emoji||'👵',function(v){m.from.emoji=v;sv();},'people',function(){return m.from.name;});
+      var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value;sv();sm.querySelector('.iname').textContent='From '+(fn.value||'…');});
+      b.appendChild(sField('From','',[fe,fn]));
+      b.appendChild(sField('Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);})]));
+      var who=el('div',{'class':'chips'});
+      cfg.kids.forEach(function(kd){var on=!m.kids||!m.kids.length||m.kids.indexOf(kd.id)>-1;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
+        c.addEventListener('click',function(){var cur=msgKids(m).slice(),i=cur.indexOf(kd.id);if(i>-1){if(cur.length>1)cur.splice(i,1);}else cur.push(kd.id);m.kids=cur.length===nKids()?[]:cur;redraw();});who.appendChild(c);});
+      b.appendChild(sField('For','',[who]));
+      var tg=el('div',{'class':'rwtypes'});
+      MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
+        bt.addEventListener('click',function(){m.when=w[0];if(w[0]==='date'&&!m.date)m.date=today();if(w[0]==='time'&&!m.time)m.time='07:30';redraw();});tg.appendChild(bt);});
+      var tf=el('div',{'class':'field col'});tf.appendChild(el('div',{'class':'fl'})).appendChild(el('b',null,'When it plays'));tf.appendChild(tg);b.appendChild(tf);
+      if(m.when==='date'){var di=el('input',{type:'date',value:m.date||'',required:'required'});di.addEventListener('change',function(){m.date=di.value;redraw();});b.appendChild(sField('Date','e.g. a birthday or the first day of school.',[di]));}
+      if(m.when==='time'){var ti=el('input',{type:'time',value:m.time||'07:30',required:'required'});ti.addEventListener('change',function(){m.time=ti.value;redraw();});b.appendChild(sField('Time','Plays if the board is on, or the next time it\'s used that morning.',[ti]));}
+      if(m.when!=='date')b.appendChild(sField('Plays',null,[sSeg([['once','Just once'],['every','Every time']],m.repeat||'once',function(v){m.repeat=v;redraw();})]));
+      var heard=msgKids(m).map(function(id){var kd=cfg.kids.filter(function(x){return x.id===id;})[0];var n=((m.played||{})[id]||[]).length;return kd?kd.emoji+' '+kd.name+': '+(n?'heard '+n+'×':'not yet'):'';}).filter(Boolean).join(' · ');
+      b.appendChild(el('p',{'class':'status'},heard));
+      var acts=el('div',{'class':'row',style:'justify-content:flex-end'});
+      acts.appendChild(sConfirm('Delete message','Tap again to delete','linkbtn',function(){photoDel('msg|'+m.id);cfg.messages.splice(idx,1);sv();renderSettings();}));
+      b.appendChild(acts);d.appendChild(b);lc.appendChild(d);
+    });
+    inner.appendChild(lc);
+  }
+  function alertMsg(t){showBanner('⚠️',t);}
+
   // ---------- About & feedback ----------
   // Where feedback goes. Google Form: paste the form's "formResponse" address and the entry ids.
   // Email: used only if no form is set (opens the parent's email app with the message filled in).
@@ -3899,8 +4059,9 @@
     var box=document.getElementById('wx');
     if(!wx||wx.date!==today()){
       box.classList.add('off');box.style.removeProperty('--wc');
-      document.getElementById('wxTitle').textContent=wxErr?'Weather not available':'Checking the weather…';
-      document.getElementById('wxSub').textContent=wxErr||'';
+      var offline=navigator.onLine===false||wxErr==='offline';
+      document.getElementById('wxTitle').textContent=offline?'📶 No internet right now':wxErr?'Weather is taking a break':'Checking the weather…';
+      document.getElementById('wxSub').textContent=offline?'The weather will show up again once this '+devWord()+' is back on wifi.':wxErr?'The weather service isn\'t answering. Medo will keep trying.':'';
       document.getElementById('wxWear').innerHTML='';
       document.getElementById('wxTemp').textContent='--°';
       return;
@@ -3952,10 +4113,11 @@
     // old or missing forecast (e.g. the tablet was on overnight): fetch first, then speak
     fetchWx().then(function(ok){
       if(ok||(wx&&wx.date===today()))say(weatherSpeech());
-      else say('Sorry, I can\'t check the weather right now. Is the internet on?');
+      else say(navigator.onLine===false?'I need the internet to check the weather. Ask a grown-up to check the wifi.':'The weather is taking a break right now. Try again soon!');
     });
   }
   document.getElementById('wx').addEventListener('click',speakWx);
+  window.addEventListener('offline',function(){if(!wx||wx.date!==today())renderWx();});
   var wxErr='';
   var wxBusy=null;
   function fetchWx(){ // returns a promise: true when fresh weather arrived
@@ -3994,8 +4156,8 @@
         }
         if(dayRain>=0)wx.rain=dayRain;
         wxErr='';save('qb_wx',wx);render();renderWx();done(true);
-      }).catch(function(){wxErr='Couldn\'t reach the weather service';renderWx();done(false);});
-    }catch(e){wxErr='Weather blocked here';renderWx();done(false);}
+      }).catch(function(){wxErr=navigator.onLine===false?'offline':'down';renderWx();done(false);});
+    }catch(e){wxErr='down';renderWx();done(false);}
     });
     wxBusy.then(function(){wxBusy=null;});
     return wxBusy;
