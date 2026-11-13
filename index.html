@@ -581,6 +581,21 @@
   .rwhist{display:flex;flex-wrap:wrap;gap:8px}
   .rwchip{display:flex;align-items:center;gap:8px;background:#1f2350;border:none;border-radius:99px;padding:6px 14px 6px 8px;color:#fff;font-family:inherit;cursor:pointer}
   .rwchip span{font-size:22px}.rwchip b{font-size:14px}.rwchip i{font-style:normal;font-size:12px;color:var(--muted)}
+  .pkbtn{font-family:inherit;font-size:16px;font-weight:700;padding:9px 14px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff;cursor:pointer;white-space:nowrap}
+  .pkbtn.empty{color:var(--muted);font-weight:600}.pkbtn:disabled{opacity:.45;cursor:default}
+  .pksheet{max-width:560px}
+  .pkprev{font-size:clamp(30px,6vw,42px);font-weight:800;text-align:center;margin:4px 0 6px;color:#ffd96a}
+  .pkgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .pkgrid button,.pkap button,.pkcal button{height:52px;border-radius:14px;border:none;background:#2f3670;color:#fff;font-family:inherit;font-size:20px;font-weight:800;cursor:pointer}
+  .pkgrid button.on,.pkap button.on,.pkcal button.on{background:#ffd23f;color:#1b1f3b}
+  .pkap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.pkap button{height:56px;font-size:22px}
+  .pknav{display:flex;align-items:center;gap:6px;margin:6px 0 10px}.pknav b{flex:1;text-align:center;font-size:19px}
+  .pknav button{width:48px;height:44px;border-radius:12px;border:none;background:#2f3670;color:#fff;font-size:22px;font-weight:800;cursor:pointer}
+  .pkcal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .pkdh{text-align:center;font-size:13px;font-weight:800;color:var(--muted);padding:2px 0}
+  .pkcal button{height:46px;font-size:17px}.pkcal button.today{box-shadow:inset 0 0 0 2px #ffd23f}.pkcal button:disabled{opacity:.3;cursor:default}
+  .pkfoot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+  @media (max-width:480px){.pkgrid{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
 <body>
@@ -650,7 +665,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · leave for activities';
+  var BOARD_VERSION='14 Nov 2026 · own time + date pickers';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1816,7 +1831,7 @@
       body.appendChild(el('h2',null,'What time do you leave on school days?'));
       body.appendChild(el('p',{'class':'susub'},'A little runner counts down on the board so the kids can see how long is left. Monday to Friday; change single days later.'));
       var cur3=cfg.days[1].leave||'08:15';
-      var ti=el('input',{type:'time',value:cur3,'class':'sutime'});body.appendChild(ti);
+      var ti=el('input',{type:'time',value:cur3,'class':'sutime',required:'required'});body.appendChild(ti);
       var none=el('button',{'class':'suskip',style:'align-self:flex-start'},'We don\'t leave at a set time');
       none.addEventListener('click',function(){for(var d=1;d<=5;d++)cfg.days[d].leave='';sv();next();});body.appendChild(none);
       nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',function(){if(ti.value){for(var d=1;d<=5;d++)cfg.days[d].leave=ti.value;sv();}next();}));
@@ -2351,6 +2366,94 @@
     inner.appendChild(el('p',{'class':'ssub'},'A new child starts with the same quests as the first child. Change them in Quests.'));
   }
 
+  // ================= Our own time and date pickers (no Android pop-ups) =================
+  // Every <input type="time"> and <input type="date"> in Settings and the setup is swapped for a button that opens these.
+  // The original input stays (hidden) and gets the new value plus a "change" event, so existing code keeps working.
+  var MON_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],DAY_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function pkTimeText(v){if(!v)return '';var p=v.split(':'),h=+p[0];return ((h%12)||12)+':'+p[1]+(h<12?' am':' pm');}
+  function pkDateText(v){if(!v)return '';var d=parseD(v);return DAY_SHORT[d.getDay()]+' '+d.getDate()+' '+MON_SHORT[d.getMonth()]+' '+d.getFullYear();}
+  function pkSheet(title){
+    var ov=el('div',{'class':'emoov'}),sh=el('div',{'class':'emosheet pksheet'});ov.appendChild(sh);
+    var hd=el('div',{'class':'emohead'});hd.appendChild(el('b',null,title));
+    var x=el('button',{'class':'tclose',title:'Close'},'✕');x.addEventListener('click',function(){ov.remove();});hd.appendChild(x);sh.appendChild(hd);
+    var body=el('div',{'class':'emobody'});sh.appendChild(body);
+    ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+    document.body.appendChild(ov);
+    return {ov:ov,body:body};
+  }
+  function setInput(inp,v){inp.value=v;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));}
+  function openTimePicker(inp,done){
+    var S=pkSheet('Pick a time'),v=inp.value||'08:00',p=v.split(':'),H=+p[0],M=+p[1];
+    var prev=el('div',{'class':'pkprev'});S.body.appendChild(prev);
+    var hg=el('div',{'class':'pkgrid'}),mg=el('div',{'class':'pkgrid'}),ap=el('div',{'class':'pkap'});
+    function draw(){
+      prev.textContent=pkTimeText(String(H).padStart(2,'0')+':'+String(M).padStart(2,'0'));
+      [].forEach.call(hg.children,function(b){b.classList.toggle('on',+b.dataset.h===((H%12)||12));});
+      [].forEach.call(mg.children,function(b){b.classList.toggle('on',+b.dataset.m===M);});
+      [].forEach.call(ap.children,function(b){b.classList.toggle('on',(b.dataset.pm==='1')===(H>=12));});
+    }
+    for(var h=1;h<=12;h++)(function(h){var b=el('button',{'data-h':String(h)},String(h));b.addEventListener('click',function(){var pm=H>=12;H=(h%12)+(pm?12:0);draw();});hg.appendChild(b);})(h);
+    var mins=[0,5,10,15,20,25,30,35,40,45,50,55];if(mins.indexOf(M)<0){mins.push(M);mins.sort(function(a,b){return a-b;});}
+    mins.forEach(function(m){var b=el('button',{'data-m':String(m)},':'+String(m).padStart(2,'0'));b.addEventListener('click',function(){M=m;draw();});mg.appendChild(b);});
+    [['0','am'],['1','pm']].forEach(function(x){var b=el('button',{'data-pm':x[0]},x[1]);b.addEventListener('click',function(){if(x[0]==='1'&&H<12)H+=12;if(x[0]==='0'&&H>=12)H-=12;draw();});ap.appendChild(b);});
+    S.body.appendChild(el('div',{'class':'emocat'},'Hour'));S.body.appendChild(hg);
+    S.body.appendChild(el('div',{'class':'emocat'},'Minutes'));S.body.appendChild(mg);
+    S.body.appendChild(ap);
+    var foot=el('div',{'class':'pkfoot'});
+    if(!inp.required)foot.appendChild(sBtn('Clear','',function(){S.ov.remove();setInput(inp,'');done();}));
+    foot.appendChild(sBtn('Set','primary',function(){S.ov.remove();setInput(inp,String(H).padStart(2,'0')+':'+String(M).padStart(2,'0'));done();}));
+    S.body.appendChild(foot);draw();
+  }
+  function openDatePicker(inp,done){
+    var S=pkSheet('Pick a date'),sel=inp.value?parseD(inp.value):null,base=sel||today0(),y=base.getFullYear(),m=base.getMonth();
+    var mx=inp.max?parseD(inp.max):null,mn=inp.min?parseD(inp.min):null,sundayFirst=(cfg.holidays&&cfg.holidays.country)==='US';
+    var prev=el('div',{'class':'pkprev'},sel?pkDateText(inp.value):'No date yet');S.body.appendChild(prev);
+    var nav=el('div',{'class':'pknav'}),title=el('b');
+    function navBtn(txt,lab,fn){var b=el('button',{title:lab},txt);b.addEventListener('click',function(){fn();draw();});return b;}
+    nav.appendChild(navBtn('«','Year back',function(){y--;}));nav.appendChild(navBtn('‹','Month back',function(){if(--m<0){m=11;y--;}}));
+    nav.appendChild(title);
+    nav.appendChild(navBtn('›','Month forward',function(){if(++m>11){m=0;y++;}}));nav.appendChild(navBtn('»','Year forward',function(){y++;}));
+    S.body.appendChild(nav);
+    var cal=el('div',{'class':'pkcal'});S.body.appendChild(cal);
+    function draw(){
+      title.textContent=['January','February','March','April','May','June','July','August','September','October','November','December'][m]+' '+y;
+      cal.innerHTML='';
+      var heads=sundayFirst?['Su','Mo','Tu','We','Th','Fr','Sa']:['Mo','Tu','We','Th','Fr','Sa','Su'];
+      heads.forEach(function(h){cal.appendChild(el('span',{'class':'pkdh'},h));});
+      var first=new Date(y,m,1),lead=sundayFirst?first.getDay():(first.getDay()+6)%7,n=new Date(y,m+1,0).getDate(),t0=today0();
+      for(var i=0;i<lead;i++)cal.appendChild(el('span'));
+      for(var d=1;d<=n;d++)(function(d){
+        var dt=new Date(y,m,d),b=el('button',null,String(d));
+        if(+dt===+t0)b.classList.add('today');
+        if(sel&&+dt===+sel)b.classList.add('on');
+        if((mx&&dt>mx)||(mn&&dt<mn))b.disabled=true;
+        b.addEventListener('click',function(){S.ov.remove();setInput(inp,ymd(dt));done();});
+        cal.appendChild(b);
+      })(d);
+    }
+    var foot=el('div',{'class':'pkfoot'});
+    foot.appendChild(sBtn('Today','',function(){var t=today0();if(mx&&t>mx)return;y=t.getFullYear();m=t.getMonth();draw();}));
+    if(!inp.required)foot.appendChild(sBtn('Clear','',function(){S.ov.remove();setInput(inp,'');done();}));
+    S.body.appendChild(foot);draw();
+  }
+  function upgradePickers(root){
+    [].forEach.call(root.querySelectorAll('input[type=time]:not([data-pk]),input[type=date]:not([data-pk])'),function(inp){
+      inp.setAttribute('data-pk','1');
+      var isTime=inp.type==='time',btn=el('button',{type:'button','class':'pkbtn'});
+      function label(){var v=inp.value;btn.textContent=(isTime?'🕒 ':'📅 ')+(v?(isTime?pkTimeText(v):pkDateText(v)):(isTime?'Set a time':'Pick a date'));btn.classList.toggle('empty',!v);btn.disabled=inp.disabled;}
+      label();
+      btn.addEventListener('click',function(e){e.preventDefault();if(inp.disabled)return;(isTime?openTimePicker:openDatePicker)(inp,label);});
+      inp.addEventListener('change',label);
+      // keep the button in step when code enables/disables or changes the input
+      new MutationObserver(label).observe(inp,{attributes:true,attributeFilter:['disabled','value']});
+      inp.style.display='none';inp.parentNode.insertBefore(btn,inp.nextSibling);
+    });
+  }
+  (function(){
+    var watch=function(){[document.getElementById('settings'),document.getElementById('setupOv')].forEach(function(r){if(r)upgradePickers(r);});};
+    new MutationObserver(watch).observe(document.body,{childList:true,subtree:true});
+  })();
+
   // ---------- Emoji picker (no keyboard) ----------
   var EMO_SETS={
     quest:[['Washing & teeth',['🚽','🧼','🪥','🦷','🛁','🚿','🧴','🪮','💇','🧻','🤧','🩹','💊']],
@@ -2553,7 +2656,7 @@
     var tc=sCard('Leaving times','Turn off days with no rush, like weekends.');
     [1,2,3,4,5,6,0].forEach(function(d){
       var day=cfg.days[d];
-      var tm=el('input',{type:'time',value:day.leave||'08:15'});tm.disabled=!day.leave;
+      var tm=el('input',{type:'time',value:day.leave||'08:15',required:'required'});tm.disabled=!day.leave;
       tm.addEventListener('change',function(){if(tm.value){day.leave=tm.value;sv();}});
       tc.appendChild(sField(DAYS[d]+(d===new Date().getDay()?' (today)':''),day.leave?'':'No countdown',[tm,sSwitch(!!day.leave,function(on){day.leave=on?(tm.value||'08:15'):'';tm.disabled=!on;sv();renderSettings();})]));
     });
@@ -2627,7 +2730,7 @@
       });
       b.appendChild(sField('Who\'s it for','Tap to include or leave out each child.',[whoBox]));
       // when
-      var dt=el('input',{type:'date',value:ev.date||''});dt.addEventListener('change',function(){ev.date=dt.value;evQuestCache.day='';redraw();});
+      var dt=el('input',{type:'date',value:ev.date||'',required:'required'});dt.addEventListener('change',function(){ev.date=dt.value;evQuestCache.day='';redraw();});
       var tm=el('input',{type:'time',value:ev.time||''});tm.addEventListener('change',function(){ev.time=tm.value;sv();});
       var clr=ev.time?sBtn('No time','',function(){ev.time='';redraw();}):null;
       b.appendChild(sField(r==='birthday'?'Date of birth':(r==='none'?'Date':'Starts on'),r==='birthday'?'Include the real year so the board knows how old they\'ll be.':'',[dt]));

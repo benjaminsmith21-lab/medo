@@ -157,3 +157,31 @@ test('calendar link carries the weekly repeat and end date',async()=>{
   assert.match(decodeURIComponent(opened),/RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=FR;UNTIL=20270326/);
   assert.match(opened,/T160000\//);t.close();
 });
+
+test('own time picker: no Android clock; 4 + :00 + pm sets 16:00 on the event',async()=>{
+  const t=boot({cfg:c=>{c.events=[{id:'n1',emoji:'🏄',name:'Nippers',date:'2026-11-06',repeat:'weekly',wdays:[5],leave:'05:00'}];}});
+  await wait(300);t.openSettings('Events');const it=t.d.querySelector('details.item');it.open=true;await wait(50);
+  const btn=[...it.querySelectorAll('.pkbtn')].find(b=>/5:00 am/.test(b.textContent));assert.ok(btn,'leave time shows as an in-app button');
+  assert.equal(it.querySelectorAll('input[type=time]:not([style*="none"])').length,0,'native time boxes are hidden');
+  btn.click();
+  const sheet=t.d.querySelector('.pksheet');
+  [...sheet.querySelectorAll('.pkgrid button')].find(b=>b.textContent==='4').click();
+  [...sheet.querySelectorAll('.pkgrid button')].find(b=>b.textContent===':00').click();
+  [...sheet.querySelectorAll('.pkap button')].find(b=>b.textContent==='pm').click();
+  t.button('Set',sheet).click();
+  assert.equal(t.cfg().events[0].leave,'16:00');
+  assert.match(btn.textContent,/4:00 pm/);t.close();
+});
+
+test('own date picker: birthday picked from the calendar, future dates blocked',async()=>{
+  const t=boot();await wait(300);t.openSettings('Children');await wait(50);
+  const btn=[...t.d.querySelectorAll('.pkbtn')][0];btn.click();
+  const sheet=t.d.querySelector('.pksheet');
+  for(let i=0;i<6;i++)sheet.querySelector('.pknav button[title="Year back"]').click();
+  assert.ok(sheet.querySelector('.pknav b').textContent.endsWith(String(new Date().getFullYear()-6)));
+  [...sheet.querySelectorAll('.pkcal button')].find(b=>b.textContent==='12').click();
+  assert.match(t.cfg().kids[0].birthday,new RegExp('^'+(new Date().getFullYear()-6)+'-\\d\\d-12$'));
+  btn.click();const s2=t.d.querySelector('.pksheet');
+  s2.querySelector('.pknav button[title="Year forward"]').click();for(let i=0;i<7;i++)s2.querySelector('.pknav button[title="Year forward"]').click();
+  assert.ok([...s2.querySelectorAll('.pkcal button')].every(b=>b.disabled),'a birthday can\'t be in the future');t.close();
+});
