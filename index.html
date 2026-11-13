@@ -482,7 +482,7 @@
   .pfno{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--muted);background:#232858}
   .pfno.big{font-size:90px;width:300px;max-width:80vw;border-radius:16px}
   .pfcap{padding:8px 10px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px}.pfcap b{color:#fff;font-size:14px}
-  .pflight{position:fixed;inset:0;z-index:90;background:rgba(8,10,30,.88);display:flex;align-items:center;justify-content:center;padding:16px}
+  .pflight{position:fixed;inset:0;z-index:120;background:rgba(8,10,30,.88);display:flex;align-items:center;justify-content:center;padding:16px}
   .pflcard{background:#232858;border-radius:22px;padding:14px;max-width:min(900px,96vw);max-height:94vh;display:flex;flex-direction:column;align-items:center;overflow:auto}
   .pflcard img{max-width:100%;max-height:68vh;border-radius:14px}
   .pflcard .pfcap{font-size:16px;text-align:center}
@@ -538,6 +538,20 @@
   .fbtext,.fbemail{width:100%;box-sizing:border-box;margin-top:10px;font-family:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff}
   .fbtext{resize:vertical;min-height:96px}
   .credit{color:#8fb7ff;text-decoration:none;font-weight:700}
+
+  .emobtn{width:64px;height:48px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:none}
+  .emoi{font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center}.emoi .svgicon{width:30px;height:30px}
+  .emoov{position:fixed;inset:0;z-index:120;background:rgba(8,10,30,.7);display:flex;align-items:flex-end;justify-content:center}
+  .emosheet{background:#232858;width:min(760px,100%);max-height:78vh;border-radius:24px 24px 0 0;display:flex;flex-direction:column;animation:emoUp .25s ease-out;box-shadow:0 -10px 30px rgba(0,0,0,.4)}
+  @keyframes emoUp{from{transform:translateY(40px);opacity:0}}
+  .emohead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px;font-size:20px}.emohead .tclose{width:48px;height:48px;font-size:22px}
+  .emobody{overflow-y:auto;padding:0 16px 18px}
+  .emocat{font-size:14px;font-weight:800;color:#ffd96a;margin:12px 0 6px}
+  .emogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px}
+  .emogrid button{height:58px;border-radius:14px;border:none;background:#2f3670;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .emogrid button:active{transform:scale(.92)}
+  .emogrid .emoi{font-size:32px}.emogrid .emoi .svgicon{width:38px;height:38px}
+  .emoother{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid #3a4180}
 </style>
 </head>
 <body>
@@ -607,7 +621,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · about + feedback';
+  var BOARD_VERSION='13 Nov 2026 · emoji picker';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2210,6 +2224,66 @@
     inner.appendChild(el('p',{'class':'ssub'},'A new child starts with the same quests as the first child. Change them in Quests.'));
   }
 
+  // ---------- Emoji picker (no keyboard) ----------
+  var EMO_SETS={
+    quest:[['Washing & teeth',['🚽','🧼','🪥','🦷','🛁','🚿','🧴','🪮','💇','🧻','🤧','🩹','💊']],
+      ['Clothes',['👕','👖','🩳','👗','🧦','👟','🥾','🧢','👒','🧥','🧤','🧣','🩱','🎽']],
+      ['Food & drink',['🥣','🍳','🥪','🍎','🍌','🥛','💧','🍱','🥕','🍽️','🥤']],
+      ['School & activities',['🎒','📚','📖','📗','✏️','🖍️','📝','🏫','🎨','🎵','🎹','🏊','⚽','🩰']],
+      ['Jobs at home',['🛏️','🧸','🧹','🧺','🗑️','🌱','🐶','🐱','🐟','🧽','🪴','📦','👞']],
+      ['Bedtime',['🛌','🌙','😴','💤','🧸']],
+      ['Fun & feelings',['⭐','🌟','🎉','❤️','😊','🤗','🙏','🎶','🧩','🚲','🏃','🧘']]],
+    event:[['Celebrations',['🎂','🎈','🎁','🎉','🎄','🎃','🐣','🎆','🎓','💐']],
+      ['Going places',['🏖️','✈️','⛺','🏕️','🚗','🚆','🎡','🏞️','🏫','🏥','🦷']],
+      ['Activities',['⚽','🏊','🩰','🎹','🎨','🥋','🏀','🎾','🤸','🧸','🎬','🍕']],
+      ['People',['👵','👴','👨‍👩‍👧','🧑‍🤝‍🧑','👶','🐶']]],
+    reward:[['Treats',['🍦','🍕','🍭','🍫','🍩','🧁','🍿']],
+      ['Outings',['🏞️','🎬','🎡','🛝','🏊','🚲','🎟️']],
+      ['Things',['🎁','📕','🧸','🎮','🎨','🧩','⭐','🏆','💰','🦷']]]
+  };
+  var EMO_HINTS=[[/read|book|library/,['📖','📚','📗']],[/teeth|tooth|floss/,['🪥','🦷']],[/hair/,['🪮','💇']],[/dress|cloth|uniform|jumper/,['👕','👗','🎽']],
+    [/shoe|sock/,['👟','🧦']],[/hat|sun/,['🧢','🧴','😎']],[/bed\b|make bed/,['🛏️']],[/tidy|toy|clean/,['🧸','🧹','🧺']],[/dish|plate|table/,['🍽️','🧽']],
+    [/lunch/,['🥪','🍱']],[/breakfast|eat|food|snack/,['🥣','🍳','🍎']],[/dog|pet|cat|fish|feed/,['🐶','🐱','🐟']],[/plant|garden/,['🌱','🪴']],[/water|drink/,['💧','🥤']],
+    [/bag|school/,['🎒','🏫']],[/swim/,['🏊','🩱']],[/piano|music|practi/,['🎹','🎵']],[/bath|shower|wash/,['🛁','🚿','🧼']],[/toilet|potty|wee/,['🚽','🧻']],
+    [/pyjama|pj|sleep|bedtime/,['🛌','🌙']],[/medicine|vitamin|cream/,['💊','🧴']],[/rubbish|bin|trash/,['🗑️']],[/homework|write|draw/,['✏️','📝','🖍️']],
+    [/birthday|bday/,['🎂','🎈','🎁']],[/party/,['🎈','🎉']],[/holiday|trip|beach/,['🏖️','✈️']],[/camp/,['⛺','🏕️']],[/soccer|football/,['⚽']],[/dance|ballet/,['🩰']],
+    [/dentist/,['🦷']],[/doctor/,['🏥']],[/grandma|nan|nana/,['👵']],[/grandpa|pop/,['👴']],[/ice ?cream/,['🍦']],[/pizza|dinner/,['🍕','🍽️']],[/movie|film/,['🎬','🍿']],[/park|playground/,['🏞️','🛝']]];
+  function emojiBtn(val,onPick,set,labelFn){
+    var b=el('button',{'class':'emobtn',type:'button',title:'Pick a picture'});
+    function show(v){b.innerHTML='';b.appendChild(iconEl(v||'➕','emoi'));}
+    show(val);
+    b.addEventListener('click',function(e){e.preventDefault();openEmojiPicker(set||'quest',labelFn?labelFn():'',function(v){show(v);onPick(v);});});
+    return b;
+  }
+  function openEmojiPicker(set,label,onPick){
+    var ov=el('div',{'class':'emoov'}),sh=el('div',{'class':'emosheet'});ov.appendChild(sh);
+    var hd=el('div',{'class':'emohead'});hd.appendChild(el('b',null,'Pick a picture'));
+    var x=el('button',{'class':'tclose',title:'Close'},'✕');x.addEventListener('click',function(){ov.remove();});hd.appendChild(x);sh.appendChild(hd);
+    var body=el('div',{'class':'emobody'});sh.appendChild(body);
+    function choose(v){ov.remove();onPick(v);}
+    function grid(title,list){
+      list=list.filter(function(ch){return /^svg:/.test(ch)||ch==='🪮'||emojiOK(ch);});   // hide pictures this device can't show
+      if(!list.length)return;
+      body.appendChild(el('div',{'class':'emocat'},title));
+      var g=el('div',{'class':'emogrid'});
+      list.forEach(function(ch){var bt=el('button',{type:'button'});bt.appendChild(iconEl(ch,'emoi'));bt.addEventListener('click',function(){choose(ch);});g.appendChild(bt);});
+      body.appendChild(g);
+    }
+    var lab=(label||'').toLowerCase(),sug=[];
+    if(lab)EMO_HINTS.forEach(function(h){if(h[0].test(lab))h[1].forEach(function(c){if(sug.indexOf(c)<0)sug.push(c);});});
+    if(sug.length)grid('Suggested for "'+label+'"',sug);
+    if(set==='quest')grid('Drawn pictures',['svg:jumper','svg:cream','🪮']);
+    (EMO_SETS[set]||EMO_SETS.quest).forEach(function(c){grid(c[0],c[1]);});
+    // anything else: the device's own emoji keyboard
+    var other=el('div',{'class':'emoother'});
+    var oi=el('input',{type:'text','class':'emo',maxlength:'4',placeholder:'🙂'});
+    var ob=sBtn('Use','',function(){if(oi.value.trim())choose(oi.value.trim());});
+    other.appendChild(el('span',{'class':'muted'},'Something else? Type any emoji:'));other.appendChild(oi);other.appendChild(ob);
+    body.appendChild(other);
+    ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+    document.body.appendChild(ov);
+  }
+
   // ---------- Quests ----------
   function setQuests(inner){
     sHead(inner,'Quests','Choose which jobs each child does on each day, and edit the jobs themselves.');
@@ -2302,11 +2376,12 @@
   function setQuestList(inner){
     var addc=sCard('Add a quest','It starts switched off. Turn it on for each child in "Plan the week".');
     var row=el('div',{'class':'row'});
-    var ne=el('input',{type:'text','class':'emo',placeholder:'🍎',maxlength:'4'});
+    var newEmo='';
     var nl=el('input',{type:'text',placeholder:'e.g. Feed the dog',maxlength:'28',style:'flex:1;min-width:160px'});
+    var ne=emojiBtn('',function(v){newEmo=v;},'quest',function(){return nl.value.trim();});
     var per='am';var ps=sSeg([['am','Morning'],['pm','Afternoon']],'am',function(v){per=v;});
     row.appendChild(ne);row.appendChild(nl);row.appendChild(ps);
-    row.appendChild(sBtn('Add','primary',function(){if(!nl.value.trim())return;cfg.steps.push({id:'s'+Date.now(),emoji:ne.value||'⭐',label:nl.value.trim(),period:per});sv();renderSettings();}));
+    row.appendChild(sBtn('Add','primary',function(){if(!nl.value.trim())return;cfg.steps.push({id:'s'+Date.now(),emoji:newEmo||'⭐',label:nl.value.trim(),period:per});sv();renderSettings();}));
     addc.appendChild(row);inner.appendChild(addc);
     [['am','🌅 Morning quests'],['pm','☀️ Afternoon quests']].forEach(function(pp){
       var c=sCard(pp[1],'Tap a quest to edit it. Drag ⠿ to change the order on the board.');
@@ -2318,8 +2393,7 @@
         sm.appendChild(grip());sm.appendChild(iconEl(s.emoji,'iic'));sm.appendChild(el('span',{'class':'iname'},s.label));
         sm.appendChild(el('span',{'class':'tag'},(s.proof==='photo'?'📸 ':s.proof==='parent'?'🙋 ':'')+'🗣️ '+pastPhrase(s)));
         d.appendChild(sm);var b=el('div',{'class':'body'});
-        var e1=el('input',{type:'text','class':'emo',value:/^svg:/.test(s.emoji)?'':s.emoji,placeholder:/^svg:/.test(s.emoji)?'🖼️':'',maxlength:'4',title:/^svg:/.test(s.emoji)?'Uses a built-in picture. Type an emoji to replace it.':''});
-        e1.addEventListener('input',function(){if(e1.value.trim()){s.emoji=e1.value;sv();}});
+        var e1=emojiBtn(s.emoji,function(v){s.emoji=v;sv();var ic=sm.querySelector('.iic');if(ic)ic.replaceWith(iconEl(v,'iic'));},'quest',function(){return s.label;});
         var l1=el('input',{type:'text',value:s.label,maxlength:'28',style:'flex:1;min-width:160px'});l1.addEventListener('input',function(){s.label=l1.value;sv();});
         b.appendChild(sField('Picture and name','',[e1,l1]));
         b.appendChild(sField('Part of the day','',[sSeg([['am','Morning'],['pm','Afternoon']],stepPeriod(s),function(v){s.period=v;sv();renderSettings();})]));
@@ -2402,7 +2476,7 @@
       d.appendChild(sm);var b=el('div',{'class':'body'});
       function redraw(){openEvent=ev.id;sv();renderSettings();}
       // what + who
-      var em=el('input',{type:'text','class':'emo',value:ev.emoji||'',maxlength:'4'});em.addEventListener('input',function(){ev.emoji=em.value;sv();});
+      var em=emojiBtn(ev.emoji||'',function(v){ev.emoji=v;evQuestCache.day='';sv();},'event',function(){return ev.name||'';});
       var nm=el('input',{type:'text',value:ev.name||'',placeholder:'What is it?',style:'flex:1;min-width:160px'});nm.addEventListener('input',function(){ev.name=nm.value;sv();});
       b.appendChild(sField('Picture and name',r==='birthday'?'e.g. Grandma\'s birthday (your children\'s birthdays go in Children)':'e.g. Soccer training',[em,nm]));
       var whoBox=el('div',{'class':'chips'});
@@ -2552,7 +2626,7 @@
       d.addEventListener('toggle',function(){if(d.open)openReward=rw.id;else if(openReward===rw.id)openReward=null;});
       d.appendChild(sm);var b=el('div',{'class':'body'});
       function redraw(){openReward=rw.id;sv();renderSettings();}
-      var em=el('input',{type:'text','class':'emo',value:rw.emoji||'',maxlength:'4',placeholder:'🎁'});em.addEventListener('input',function(){rw.emoji=em.value;sv();});
+      var em=emojiBtn(rw.emoji||'🎁',function(v){rw.emoji=v;sv();render();},'reward',function(){return rw.prize||'';});
       var pz=el('input',{type:'text',value:rw.prize||'',placeholder:'e.g. Choose what\'s for dinner',style:'flex:1;min-width:180px'});pz.addEventListener('input',function(){rw.prize=pz.value;sv();});
       b.appendChild(sField('They get','What the reward is.',[em,pz]));
       var who=el('div',{'class':'chips'});
