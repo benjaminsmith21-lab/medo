@@ -533,6 +533,8 @@
   .storylogo{width:min(200px,50vw);height:auto;margin:4px auto 6px;display:block}
   .storyh{font-size:22px;font-weight:800;margin:6px 0 10px}
   .storyp{font-size:16px;line-height:1.6;margin:0 auto 10px;max-width:560px;color:#e6e8ff}
+  .whyrow{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid #343b78}.whyrow:first-of-type{border-top:none}
+  .whyi{font-size:30px;line-height:1;flex:none;width:40px;text-align:center}.whyrow b{font-size:17px}.whyrow p{margin:4px 0 0;line-height:1.55;color:#e6e8ff}
   .storytags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
   .storytags span{background:#3d2f12;color:#ffd96a;border-radius:99px;padding:6px 12px;font-weight:800;font-size:14px}
   .fbtext,.fbemail{width:100%;box-sizing:border-box;margin-top:10px;font-family:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff}
@@ -621,7 +623,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='13 Nov 2026 · feedback on';
+  var BOARD_VERSION='13 Nov 2026 · why it works';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2900,8 +2902,19 @@
      ['So we built a board that hands the job back to the kids. They tick off their own quests, hear a cheer for every one, watch the little runner race to the car, and fill their own star jar. We just watch, and say less.'],
      ['Medo is free. It works offline, keeps everything on your device, and has no ads and no accounts.']
     ].forEach(function(x,i){st.appendChild(el('p',{'class':i?'storyp':'storyh'},x[0]));});
-    var tags=el('div',{'class':'storytags'});tags.appendChild(el('span',null,'For kids: "I did it myself!"'));tags.appendChild(el('span',null,'For grown-ups: routines they own.'));st.appendChild(tags);
     inner.appendChild(st);
+    // why it works: the two taglines, explained through how young kids think
+    var wh=sCard('🧠 Why it works');
+    [['🙋','Kids want to be capable.','Between about 3 and 6, wanting to do things yourself is a big part of growing up. Every reminder from a grown-up quietly takes the job back. A board they tick themselves gives it back to them, and the proud moment at the end is theirs: "I did it myself!"'],
+     ['🖼️','Pictures do the remembering.','Young kids can only hold a step or two in their heads at once. A picture of the next job remembers for them, so the morning stops depending on how many times you ask. One-at-a-time mode keeps it to just one job for little ones.'],
+     ['⏱️','Time they can see.','Most young kids can\'t read a clock yet, so "ten minutes" doesn\'t mean much. A runner moving towards the car, and a clock hand sweeping to leaving time, shows time passing in a way they understand.'],
+     ['🎉','Praise for the doing.','The voice cheers the actual job ("You brushed your teeth!") rather than a general "good girl" or "good boy". Praising what they did helps the habit stick. Stars, rewards and trophies make progress something they can see growing.'],
+     ['🤝','Routines they own.','Put together, the routine stops being something you run and becomes something they run. For you, that means fewer reminders, fewer battles, and more mornings that start with a high five.']
+    ].forEach(function(x){
+      var r=el('div',{'class':'whyrow'});r.appendChild(el('span',{'class':'whyi'},x[0]));
+      var t=el('div');t.appendChild(el('b',null,x[1]));t.appendChild(el('p',null,x[2]));r.appendChild(t);wh.appendChild(r);
+    });
+    inner.appendChild(wh);
     // feedback
     var fc=sCard('💬 Send feedback','Ideas, bugs, or something your kids loved. It goes straight to the person who makes Medo.');
     var ftype='idea';
