@@ -296,3 +296,20 @@ test('birthday message plays on that child\'s birthday',async()=>{
   assert.deepEqual(t.played,['data:audio/webm;base64,BDAY']);
   const m=t.cfg().messages[0];assert.ok(m.played.kA&&!m.played.kB,'only the birthday child');t.close();
 });
+
+test('rain is spoken by part of the day, not just "it will rain"',async()=>{
+  const td=ymd(new Date()),time=[],pp=[],mm=[],code=[],uv=[];
+  for(let h=0;h<24;h++){time.push(td+'T'+String(h).padStart(2,'0')+':00');
+    const pm=h>=12&&h<18,eve=h>=18&&h<22;pp.push(pm||eve?90:10);mm.push(pm?0.6:eve?0.05:0);code.push(pm?61:1);uv.push(0);}
+  const data={current:{temperature_2m:18,weather_code:1},
+    daily:{temperature_2m_max:[20],temperature_2m_min:[12],precipitation_probability_max:[90],uv_index_max:[2],weather_code:[61],wind_speed_10m_max:[10],wind_gusts_10m_max:[20]},
+    hourly:{time,precipitation_probability:pp,precipitation:mm,weather_code:code,uv_index:uv}};
+  const t=boot({fetch:u=>/api\.open-meteo\.com\/v1\/forecast/.test(u)?{ok:true,json:()=>Promise.resolve(data)}:null});
+  await wait(500);t.d.getElementById('wx').click();await wait(300);
+  const said=t.lastSaid(),hr=new Date().getHours();
+  if(hr<18){assert.match(said,/It will rain after lunch/);assert.match(said,/few drops tonight/);assert.match(said,/raincoat/);
+    assert.match(t.d.getElementById('wxSub').textContent,/rain 90% after lunch/);}
+  else if(hr<22){assert.match(said,/few drops of rain tonight\./);assert.doesNotMatch(said,/raincoat/);}
+  else assert.doesNotMatch(said,/rain/);
+  t.close();
+});
