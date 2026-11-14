@@ -253,44 +253,6 @@ test('no wifi: the weather card says so plainly instead of sounding broken',asyn
   assert.match(t.lastSaid(),/need the internet to check the weather/);t.close();
 });
 
-test('recording a message: asks who and when first, then shows a script with the kids\' names',async()=>{
-  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
-  t.button('Record a new message').click();
-  const s1=t.d.querySelector('.pksheet');
-  const nm=s1.querySelector('input[type=text]');nm.value='Nana';nm.dispatchEvent(new t.w.Event('input'));
-  [...s1.querySelectorAll('.rwtype')].find(b=>b.textContent.includes('surprise')).click();
-  t.button('Next: record',s1).click();
-  const s2=t.d.querySelector('.pksheet');
-  const line=s2.querySelector('.scriptt').textContent;
-  assert.match(line,/Surprise! It's Nana/);
-  t.button('Another idea',s2).click();
-  assert.match(s2.querySelector('.scriptt').textContent,/Hello Ava!/);
-  assert.doesNotMatch(s2.querySelector('.scriptt').textContent,/Leo/);t.close();
-});
-
-test('after saving a message for one child, it offers the same for the other',async()=>{
-  const t=boot({idb:true});await wait(300);
-  t.w.eval("__medoTest.offerNextKid({id:'mx',from:{name:'Nana',emoji:'👵'},kids:['kA'],when:'day',repeat:'once',played:{}})");
-  const sh=t.d.querySelector('.pksheet');assert.match(sh.textContent,/Record one for 🐢 Leo too\?/);
-  t.button('Yes, record for Leo',sh).click();
-  const s2=t.d.querySelector('.pksheet');
-  assert.equal(s2.querySelector('input[type=text]').value,'Nana');
-  assert.match([...s2.querySelectorAll('.chip.on')].map(c=>c.textContent).join(),/Leo/);t.close();
-});
-
-test('a message for any child has no name in the script',async()=>{
-  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
-  t.button('Record a new message').click();
-  const s1=t.d.querySelector('.pksheet');
-  t.button('Any child',s1).click();
-  [...s1.querySelectorAll('.rwtype')].find(b=>b.textContent.includes('surprise')).click();
-  t.button('Next: record',s1).click();
-  const s2=t.d.querySelector('.pksheet');
-  t.button('Another idea',s2).click();
-  const line=s2.querySelector('.scriptt').textContent;
-  assert.match(line,/^Hello! /);assert.doesNotMatch(line,/Ava|Leo/);t.close();
-});
-
 test('a message can play straight after a particular quest',async()=>{
   const t=boot({idb:true,cfg:c=>{c.arvoStart='23:59';c.messages=[{id:'m5',from:{name:'Pop',emoji:'👴'},kids:['kA'],when:'quest',quest:'teeth',repeat:'every',created:'2026-11-01',played:{}}];}});
   await t.putAudio('msg|m5','data:audio/webm;base64,EEEE');await wait(300);
@@ -299,4 +261,38 @@ test('a message can play straight after a particular quest',async()=>{
   assert.deepEqual(t.played,[],'not after another quest');
   [...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Brush teeth')).click();await wait(400);
   assert.deepEqual(t.played,['data:audio/webm;base64,EEEE']);t.close();
+});
+
+test('recording a message: pick a moment, then a script that fits who it is for',async()=>{
+  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
+  t.button('Record a new message').click();
+  const s1=t.d.querySelector('.pksheet');
+  assert.equal(s1.querySelectorAll('.rwtype.mom').length,5,'five moments to pick from');
+  [...s1.querySelectorAll('.rwtype')].find(b=>b.textContent.includes('Surprise')).click();
+  const s2=t.d.querySelector('.pksheet');
+  const nm=s2.querySelector('.recwho input[type=text]');nm.value='Nana';nm.dispatchEvent(new t.w.Event('input'));
+  assert.match(s2.querySelector('.scriptt').textContent,/Surprise! It's Nana/);
+  t.button('Another idea',s2).click();
+  assert.match(s2.querySelector('.scriptt').textContent,/^Hello! Nana here/,'any child: no name');
+  t.button('Ava',s2).click();
+  assert.match(s2.querySelector('.scriptt').textContent,/^Hello Ava! Nana here/);t.close();
+});
+
+test('several recordings for the same moment: one plays, picked at random',async()=>{
+  const msg=(id,n)=>({id,from:{name:n,emoji:'👵'},kids:[],when:'day',repeat:'every',created:'2026-11-01',played:{}});
+  const t=boot({idb:true,cfg:c=>{c.arvoStart='00:00';c.messages=[msg('n1','Nana'),msg('p1','Pop')];},
+    storage:{qb_prog:{date:ymd(new Date()),done:[['toilet','dress','breakfast','teeth','hair','shoes'],[]],celebrated:{am:[true,false],pm:[]}}}});
+  await t.putAudio('msg|n1','data:audio/webm;base64,NANA');await t.putAudio('msg|p1','data:audio/webm;base64,POPP');await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  while(t.d.querySelector('.tile:not(.done)'))t.d.querySelector('.tile:not(.done)').click();
+  await wait(400);
+  assert.equal(t.played.length,1,'only one message for the moment');t.close();
+});
+
+test('birthday message plays on that child\'s birthday',async()=>{
+  const md=ymd(new Date()).slice(5);
+  const t=boot({idb:true,cfg:c=>{c.kids[0].birthday='2020-'+md;c.messages=[{id:'b1',from:{name:'Pop',emoji:'👴'},kids:[],when:'birthday',repeat:'every',created:'2026-11-01',played:{}}];}});
+  await t.putAudio('msg|b1','data:audio/webm;base64,BDAY');await wait(6500);
+  assert.deepEqual(t.played,['data:audio/webm;base64,BDAY']);
+  const m=t.cfg().messages[0];assert.ok(m.played.kA&&!m.played.kB,'only the birthday child');t.close();
 });
