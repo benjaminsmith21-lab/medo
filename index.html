@@ -683,7 +683,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · tidier wording';
+  var BOARD_VERSION='14 Nov 2026 · messages after a quest';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1757,7 +1757,7 @@
     quests:'"Plan the week" sets who does what each day. "Edit quests" changes the quests.',
     leaving:'The runner heads for the car as leaving time gets closer. Tap it for the talking clock.',
     rewards:'Pick an idea below to start. The board counts and tells you when it\'s earned.',
-    messages:'Hand the tablet to a grandparent and tap the red button.'
+    messages:'Tap 🎙️ Record a new message, then pass it to whoever is recording.'
   };
   function tipCard(inner,tab){
     if(tipSeen('tab:'+tab)||!TAB_TIPS[tab])return;
@@ -2007,7 +2007,7 @@
       else if(big){fanfare();confetti(k);}
       else blip();
       if(!tipSeen('undo:'+kidId(k))){markTip('undo:'+kidId(k));lines.push('Oops, wrong one? Hold your finger on it to undo.');}
-      var vm=msgAfterTick(k,left===0?per:'',star);
+      var vm=msgAfterTick(k,left===0?per:'',star,s.id);
       say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)]);}:null);
       if(big&&!isSplit()){clearTimeout(idleT);idleT=setTimeout(goHome,milestone||star?8000:6000);}
     }
@@ -3247,11 +3247,11 @@
   if(!cfg.messages)cfg.messages=[];
   // one child per message: split older "both kids" messages into one each, sharing the same recording
   (function(){var out=[],changed=false;cfg.messages.forEach(function(m){
-    var ids=m.kids&&m.kids.length?m.kids:cfg.kids.map(function(x){return x.id;});
-    if(ids.length===1&&m.kids&&m.kids.length===1){out.push(m);return;}
+    var ids=m.kids||[];
+    if(ids.length<=1){out.push(m);return;}   // one child, or [] = any child (no name)
     changed=true;ids.forEach(function(id,i){var c=JSON.parse(JSON.stringify(m));c.kids=[id];c.audio=m.audio||('msg|'+m.id);if(i)c.id=m.id+'-'+id;c.played={};c.played[id]=(m.played||{})[id]||[];out.push(c);});
   });if(changed){cfg.messages=out;save('qb_cfg',cfg);}})();
-  var MSG_WHEN=[['am','When they finish their morning','🌅'],['day','When they finish every quest for the day','⭐'],['surprise','A surprise after a quest, now and then','🎁'],['date','On a special date','📅'],['time','At a time each day','🕒']];
+  var MSG_WHEN=[['am','When they finish their morning','🌅'],['day','When they finish every quest for the day','⭐'],['quest','After a particular quest','✅'],['surprise','A surprise after a quest, now and then','🎁'],['date','On a special date','📅'],['time','At a time each day','🕒']];
   var msgAudio=null;
   function photoGet(key,cb){photoDB(function(db){if(!db)return cb(null);try{var rq=db.transaction('p','readonly').objectStore('p').get(key);rq.onsuccess=function(){cb(rq.result?rq.result.url:null);};rq.onerror=function(){cb(null);};}catch(e){cb(null);}});}
   function msgKids(m){return m.kids&&m.kids.length?m.kids:cfg.kids.map(function(x){return x.id;});}
@@ -3269,12 +3269,13 @@
     });
   }
   // after a tick: finished morning / whole day / surprise
-  function msgAfterTick(k,finishedPer,finishedDay){
+  function msgAfterTick(k,finishedPer,finishedDay,stepId){
     var kid=kidId(k),pick=null;
     cfg.messages.forEach(function(m){
       if(pick||msgKids(m).indexOf(kid)<0||msgUsedUp(m,kid)||msgPlayedToday(m,kid))return;
       if((m.when==='am'&&finishedPer==='am')||(m.when==='day'&&finishedDay))pick=m;
     });
+    if(!pick)cfg.messages.forEach(function(m){if(!pick&&m.when==='quest'&&m.quest===stepId&&msgKids(m).indexOf(kid)>-1&&!msgUsedUp(m,kid)&&!msgPlayedToday(m,kid))pick=m;});
     if(!pick){var sur=cfg.messages.filter(function(m){return m.when==='surprise'&&msgKids(m).indexOf(kid)>-1&&!msgUsedUp(m,kid)&&!msgPlayedToday(m,kid);});
       if(sur.length&&Math.random()<0.1)pick=sur[Math.floor(Math.random()*sur.length)];}
     return pick;
@@ -3310,6 +3311,9 @@
     day:['{kids}, you did every single job today! That\'s a star for your jar. I\'m so proud of you. Love, {me}.',
          'Wow! All your jobs are done. You\'re a superstar! Big hugs from {me}.',
          'Guess who\'s proud of you? Me! You did it all by yourself today. See you soon!'],
+    quest:['Great job, {kids}! You did that all by yourself. Love, {me}.',
+           'High five from {me}! Keep going, {kids}!',
+           '{kids}, I saw that! You\'re doing so well.'],
     surprise:['Surprise! It\'s {me}. I just wanted to say I love you, and I\'m proud of you. Keep going!',
               'Hello {kids}! {me} here, sneaking into your board to say you\'re doing a great job!',
               'Psst… {kids}! Guess what? You\'re awesome. That\'s all. Love, {me}!'],
@@ -3321,11 +3325,20 @@
           'Good night, {kids}. Sleep tight, and I\'ll see you very soon. Love, {me}.']
   };
   function nameList(ids){var n=cfg.kids.filter(function(k){return ids.indexOf(k.id)>-1;}).map(function(k){return k.name;});return n.length>1?n.slice(0,-1).join(', ')+' and '+n[n.length-1]:(n[0]||'');}
-  function fillScript(t,m){return t.replace(/\{kids\}/g,nameList(msgKids(m))).replace(/\{me\}/g,m.from.name||'(your name)');}
+  function fillScript(t,m){
+    if(!m.kids||!m.kids.length)   // any child: same words, no name
+      t=t.replace(/,? \{kids\}(?=[!.,?])/g,'').replace(/…!/g,'…').replace(/^\{kids\}, (\w)/,function(x,c){return c.toUpperCase();});
+    return t.replace(/\{kids\}/g,nameList(msgKids(m))).replace(/\{me\}/g,m.from.name||'(your name)');}
+  function anyChip(m,on){return el('button',{'class':'chip'+(on?' on':'')},'🌈 Any child (no name)');}
+  function questPick(m,onPick){   // which quest triggers it
+    var c=el('div',{'class':'chips'}),seen={};
+    cfg.steps.forEach(function(st){if(seen[st.id])return;seen[st.id]=1;var b=el('button',{'class':'chip'+(m.quest===st.id?' on':'')},(st.emoji||'')+' '+st.label);
+      b.addEventListener('click',function(){m.quest=st.id;onPick();});c.appendChild(b);});
+    return c;}
   // step 1 before recording: who it's for, when it plays, who it's from
   function newMessageFlow(existing,preset){
     var m=existing||preset||{id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[cfg.kids[0].id],when:'day',repeat:'once',created:today(),played:{}};
-    if(!m.kids||m.kids.length!==1)m.kids=[msgKids(m)[0]];
+    if(!m.kids)m.kids=[];else if(m.kids.length>1)m.kids=[m.kids[0]];
     var S=pkSheet(existing?'Record it again':'New message'),b=S.body;
     var fe=emojiBtn(m.from.emoji,function(v){m.from.emoji=v;},'people',function(){return m.from.name;});
     var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value.trim();});
@@ -3333,16 +3346,19 @@
     b.appendChild(el('div',{'class':'emocat'},'Who is it for?'));
     var who=el('div',{'class':'chips'});
     function drawWho(){who.innerHTML='';cfg.kids.forEach(function(kd){var on=m.kids[0]===kd.id;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
-      c.addEventListener('click',function(){m.kids=[kd.id];drawWho();});who.appendChild(c);});}
+      c.addEventListener('click',function(){m.kids=[kd.id];drawWho();});who.appendChild(c);});
+      var a=anyChip(m,!m.kids.length);a.addEventListener('click',function(){m.kids=[];drawWho();});who.appendChild(a);}
     drawWho();b.appendChild(who);
     b.appendChild(el('div',{'class':'emocat'},'When should it play?'));
     var tg=el('div',{'class':'rwtypes'});
     function drawWhen(){tg.innerHTML='';MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
-      bt.addEventListener('click',function(){m.when=w[0];drawWhen();});tg.appendChild(bt);});}
-    drawWhen();b.appendChild(tg);
+      bt.addEventListener('click',function(){m.when=w[0];drawWhen();});tg.appendChild(bt);});
+      qb.innerHTML='';if(m.when==='quest'){qb.appendChild(el('div',{'class':'emocat'},'Which quest?'));qb.appendChild(questPick(m,drawWhen));}}
+    var qb=el('div');drawWhen();b.appendChild(tg);b.appendChild(qb);
     var foot=el('div',{'class':'pkfoot'});
     foot.appendChild(sBtn('Next: record 🎙️','primary',function(){
       if(m.when==='date'&&!m.date)m.date=today();if(m.when==='time'&&!m.time)m.time='07:30';
+      if(m.when==='quest'&&!m.quest){alertMsg('Pick which quest.');return;}
       S.ov.remove();
       openRecorder(m,function(url,secs){
         m.secs=secs;delete m.audio;
@@ -3356,6 +3372,7 @@
 
   function offerNextKid(m){
     // another child without a message from this person for this moment yet?
+    if(!m.kids||!m.kids.length)return;
     var other=cfg.kids.filter(function(kd){return kd.id!==m.kids[0]&&!cfg.messages.some(function(x){return x.kids&&x.kids[0]===kd.id&&x.when===m.when&&x.from.name===m.from.name;});})[0];
     if(!other)return;
     var S=pkSheet('Saved! 💌');
@@ -3363,7 +3380,7 @@
     var f=el('div',{'class':'pkfoot',style:'justify-content:center'});
     f.appendChild(sBtn('Not now','',function(){S.ov.remove();}));
     f.appendChild(sBtn('Yes, record for '+other.name,'primary',function(){S.ov.remove();
-      newMessageFlow(null,{id:'m'+Date.now(),from:{name:m.from.name,emoji:m.from.emoji},kids:[other.id],when:m.when,date:m.date,time:m.time,repeat:m.repeat,created:today(),played:{}});}));
+      newMessageFlow(null,{id:'m'+Date.now(),from:{name:m.from.name,emoji:m.from.emoji},kids:[other.id],when:m.when,quest:m.quest,date:m.date,time:m.time,repeat:m.repeat,created:today(),played:{}});}));
     S.body.appendChild(f);
   }
   window.__medoTest={offerNextKid:offerNextKid}; // used by the automated tests
@@ -3378,7 +3395,7 @@
     sc.appendChild(sn);st.textContent=fillScript(list[0],m);body.appendChild(sc);
     var big=el('div',{'class':'recbig'}),tm=el('div',{'class':'rectime'},'0:00 / 0:30'),lvl=el('div',{'class':'reclvl'}),bar=el('div',{'class':'reclvlf'});lvl.appendChild(bar);
     var btn=el('button',{'class':'recbtn',title:'Record'});big.appendChild(btn);body.appendChild(big);body.appendChild(tm);body.appendChild(lvl);
-    var hint=el('p',{'class':'hint',style:'text-align:center'},'Tap the red button and talk. Say their name, smile, and keep it short and happy (under 30 seconds).');body.appendChild(hint);
+    var hint=el('p',{'class':'hint',style:'text-align:center'},'Tap the red button and talk. '+(m.kids&&m.kids.length?'Say their name, smile, and keep':'Smile, and keep')+' it short and happy (under 30 seconds).');body.appendChild(hint);
     var foot=el('div',{'class':'pkfoot'});body.appendChild(foot);
     function cleanup(){clearInterval(timer);cancelAnimationFrame(raf);try{if(stream)stream.getTracks().forEach(function(t){t.stop();});}catch(e){}try{if(actx)actx.close();}catch(e){}stream=null;actx=null;}
     var x=S.ov.querySelector('.tclose');x.addEventListener('click',cleanup);
@@ -3410,6 +3427,7 @@
   function msgWhenText(m){
     if(m.when==='date')return 'On '+(m.date?pkDateText(m.date):'a date');
     if(m.when==='time')return 'Every day at '+(m.time?pkTimeText(m.time):'a time');
+    if(m.when==='quest'){var st=cfg.steps.filter(function(x){return x.id===m.quest;})[0];return 'After '+(st?(st.emoji||'')+' '+st.label:'a quest');}
     return (MSG_WHEN.filter(function(x){return x[0]===m.when;})[0]||['','',''])[1];
   }
   var openMsg=null;
@@ -3423,7 +3441,7 @@
     cfg.messages.forEach(function(m,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
-      var forKd=cfg.kids.filter(function(x){return x.id===msgKids(m)[0];})[0];if(forKd)sm.appendChild(el('span',{'class':'tag'},'for '+forKd.emoji+' '+forKd.name));
+      var forKd=m.kids&&m.kids.length?cfg.kids.filter(function(x){return x.id===m.kids[0];})[0]:null;sm.appendChild(el('span',{'class':'tag'},forKd?'for '+forKd.emoji+' '+forKd.name:'for any child'));
       sm.appendChild(el('span',{'class':'tag'},msgWhenText(m)));
       if(openMsg===m.id||!m.from.name)d.open=true;
       d.addEventListener('toggle',function(){if(d.open)openMsg=m.id;else if(openMsg===m.id)openMsg=null;});
@@ -3434,14 +3452,16 @@
       b.appendChild(sField('From','',[fe,fn]));
       b.appendChild(sField('Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);}),sBtn('🎙️ Record again','',function(){newMessageFlow(m);})]));
       var who=el('div',{'class':'chips'});
-      cfg.kids.forEach(function(kd){var on=msgKids(m).indexOf(kd.id)>-1&&msgKids(m).length===1||(msgKids(m).length>1&&msgKids(m)[0]===kd.id);var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
+      cfg.kids.forEach(function(kd){var on=!!(m.kids&&m.kids[0]===kd.id);var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
         c.addEventListener('click',function(){m.kids=[kd.id];redraw();});who.appendChild(c);});
+      var ac=anyChip(m,!(m.kids&&m.kids.length));ac.addEventListener('click',function(){m.kids=[];redraw();});who.appendChild(ac);
       b.appendChild(sField('For','',[who]));
       var tg=el('div',{'class':'rwtypes'});
       MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
         bt.addEventListener('click',function(){m.when=w[0];if(w[0]==='date'&&!m.date)m.date=today();if(w[0]==='time'&&!m.time)m.time='07:30';redraw();});tg.appendChild(bt);});
       var tf=el('div',{'class':'field col'});tf.appendChild(el('div',{'class':'fl'})).appendChild(el('b',null,'When it plays'));tf.appendChild(tg);b.appendChild(tf);
       if(m.when==='date'){var di=el('input',{type:'date',value:m.date||'',required:'required'});di.addEventListener('change',function(){m.date=di.value;redraw();});b.appendChild(sField('Date','',[di]));}
+      if(m.when==='quest')b.appendChild(sField('Which quest','',[questPick(m,redraw)]));
       if(m.when==='time'){var ti=el('input',{type:'time',value:m.time||'07:30',required:'required'});ti.addEventListener('change',function(){m.time=ti.value;redraw();});b.appendChild(sField('Time','',[ti]));}
       if(m.when!=='date')b.appendChild(sField('Plays',null,[sSeg([['once','Just once'],['every','Every time']],m.repeat||'once',function(v){m.repeat=v;redraw();})]));
       var heard=msgKids(m).map(function(id){var kd=cfg.kids.filter(function(x){return x.id===id;})[0];var n=((m.played||{})[id]||[]).length;return kd?kd.emoji+' '+kd.name+': '+(n?'heard '+n+'×':'not yet'):'';}).filter(Boolean).join(' · ');

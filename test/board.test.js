@@ -223,7 +223,7 @@ test('voice message: plays after the cheer when a child finishes the day, once o
 });
 
 test('voice message on a date plays by itself when the board is on',async()=>{
-  const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m2',from:{name:'Pop',emoji:'👴'},kids:[],when:'date',date:ymd(new Date()),repeat:'once',created:'2026-11-01',played:{}}];}});
+  const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m2',from:{name:'Pop',emoji:'👴'},kids:['kA','kB'],when:'date',date:ymd(new Date()),repeat:'once',created:'2026-11-01',played:{}}];}});
   await t.putAudio('msg|m2','data:audio/webm;base64,BBBB');await wait(6500);
   assert.deepEqual(t.played,['data:audio/webm;base64,BBBB']);
   const ms=t.cfg().messages;assert.equal(ms.length,2,'an older both-kids message becomes one per child');
@@ -276,4 +276,27 @@ test('after saving a message for one child, it offers the same for the other',as
   const s2=t.d.querySelector('.pksheet');
   assert.equal(s2.querySelector('input[type=text]').value,'Nana');
   assert.match([...s2.querySelectorAll('.chip.on')].map(c=>c.textContent).join(),/Leo/);t.close();
+});
+
+test('a message for any child has no name in the script',async()=>{
+  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
+  t.button('Record a new message').click();
+  const s1=t.d.querySelector('.pksheet');
+  t.button('Any child',s1).click();
+  [...s1.querySelectorAll('.rwtype')].find(b=>b.textContent.includes('surprise')).click();
+  t.button('Next: record',s1).click();
+  const s2=t.d.querySelector('.pksheet');
+  t.button('Another idea',s2).click();
+  const line=s2.querySelector('.scriptt').textContent;
+  assert.match(line,/^Hello! /);assert.doesNotMatch(line,/Ava|Leo/);t.close();
+});
+
+test('a message can play straight after a particular quest',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.arvoStart='23:59';c.messages=[{id:'m5',from:{name:'Pop',emoji:'👴'},kids:['kA'],when:'quest',quest:'teeth',repeat:'every',created:'2026-11-01',played:{}}];}});
+  await t.putAudio('msg|m5','data:audio/webm;base64,EEEE');await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  [...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Get dressed')).click();await wait(300);
+  assert.deepEqual(t.played,[],'not after another quest');
+  [...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Brush teeth')).click();await wait(400);
+  assert.deepEqual(t.played,['data:audio/webm;base64,EEEE']);t.close();
 });
