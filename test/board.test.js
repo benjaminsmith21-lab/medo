@@ -250,3 +250,17 @@ test('no wifi: the weather card says so plainly instead of sounding broken',asyn
   t.d.getElementById('wx').click();await wait(200);
   assert.match(t.lastSaid(),/need the internet to check the weather/);t.close();
 });
+
+test('recording a message: asks who and when first, then shows a script with the kids\' names',async()=>{
+  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
+  t.button('Record a new message').click();
+  const s1=t.d.querySelector('.pksheet');
+  const nm=s1.querySelector('input[type=text]');nm.value='Nana';nm.dispatchEvent(new t.w.Event('input'));
+  [...s1.querySelectorAll('.rwtype')].find(b=>b.textContent.includes('surprise')).click();
+  t.button('Next: record',s1).click();
+  const s2=t.d.querySelector('.pksheet');
+  const line=s2.querySelector('.scriptt').textContent;
+  assert.match(line,/Surprise! It's Nana/);
+  t.button('Another idea',s2).click();
+  assert.match(s2.querySelector('.scriptt').textContent,/Ava and Leo/);t.close();
+});

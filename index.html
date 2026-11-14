@@ -609,6 +609,11 @@
   @keyframes recpulse{50%{box-shadow:0 6px 0 rgba(0,0,0,.35),0 0 0 14px rgba(255,77,109,.3)}}
   .rectime{text-align:center;font-size:24px;font-weight:800;color:#ffd96a}
   .reclvl{height:10px;border-radius:99px;background:#12153a;overflow:hidden;margin:10px auto;max-width:300px}.reclvlf{height:100%;width:0;background:#5fe39d;border-radius:99px;transition:width .08s}
+
+  .script{background:#1a1e46;border:2px solid #3f4690;border-radius:16px;padding:12px 14px;margin-bottom:8px}
+  .scripth{font-size:13px;font-weight:800;color:#ffd96a;margin-bottom:6px}
+  .scriptt{font-size:clamp(19px,2.6vw,24px);line-height:1.45;font-weight:700;color:#fff}
+  .scriptnav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -678,7 +683,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · voice messages + clearer offline';
+  var BOARD_VERSION='14 Nov 2026 · message scripts';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3300,12 +3305,68 @@
   setInterval(function(){try{msgCheck();}catch(e){}},30000);
   document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(msgCheck,1500);});
   setTimeout(function(){try{msgCheck();}catch(e){}},4000);
+  // ---- what to say: scripts for each kind of moment, with the children's names filled in ----
+  var MSG_SCRIPTS={
+    am:['Hi {kids}! It\'s {me} here. You finished your whole morning all by yourself! I\'m so proud of you. Have the best day!',
+        'Woohoo, {kids}! Morning jobs all done! Give yourself a big high five from me. Love you!',
+        '{kids}, you\'re all ready to go! That\'s amazing. I can\'t wait to hear about your day.'],
+    day:['{kids}, you did every single job today! That\'s a star for your jar. I\'m so proud of you. Love, {me}.',
+         'Wow! All your jobs are done. You\'re a superstar! Big hugs from {me}.',
+         'Guess who\'s proud of you? Me! You did it all by yourself today. See you soon!'],
+    surprise:['Surprise! It\'s {me}. I just wanted to say I love you, and I\'m proud of you. Keep going!',
+              'Hello {kids}! {me} here, sneaking into your board to say you\'re doing a great job!',
+              'Psst… {kids}! Guess what? You\'re awesome. That\'s all. Love, {me}!'],
+    date:['Happy birthday, {kids}! It\'s {me}. I hope your day is full of cake and fun. Love you to the moon!',
+          'Happy first day of school, {kids}! You\'re going to have a wonderful day. I\'m so proud of you.',
+          'Today is a special day, {kids}! I\'m thinking of you and sending you the biggest hug.'],
+    time:['Good morning, {kids}! It\'s {me}. Time to start your jobs. You can do it!',
+          'Rise and shine, {kids}! I hope you have a lovely day. I love you!',
+          'Good night, {kids}. Sleep tight, and I\'ll see you very soon. Love, {me}.']
+  };
+  function nameList(ids){var n=cfg.kids.filter(function(k){return ids.indexOf(k.id)>-1;}).map(function(k){return k.name;});return n.length>1?n.slice(0,-1).join(', ')+' and '+n[n.length-1]:(n[0]||'');}
+  function fillScript(t,m){return t.replace(/\{kids\}/g,nameList(msgKids(m))).replace(/\{me\}/g,m.from.name||'(your name)');}
+  // step 1 before recording: who it's for, when it plays, who it's from
+  function newMessageFlow(existing){
+    var m=existing||{id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[],when:'day',repeat:'once',created:today(),played:{}};
+    var S=pkSheet(existing?'Record it again':'New message'),b=S.body;
+    var fe=emojiBtn(m.from.emoji,function(v){m.from.emoji=v;},'people',function(){return m.from.name;});
+    var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value.trim();});
+    b.appendChild(el('div',{'class':'emocat'},'Who is it from?'));var r1=el('div',{'class':'row'});r1.appendChild(fe);r1.appendChild(fn);b.appendChild(r1);
+    b.appendChild(el('div',{'class':'emocat'},'Who is it for?'));
+    var who=el('div',{'class':'chips'});
+    function drawWho(){who.innerHTML='';cfg.kids.forEach(function(kd){var on=msgKids(m).indexOf(kd.id)>-1;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
+      c.addEventListener('click',function(){var cur=msgKids(m).slice(),i=cur.indexOf(kd.id);if(i>-1){if(cur.length>1)cur.splice(i,1);}else cur.push(kd.id);m.kids=cur.length===nKids()?[]:cur;drawWho();});who.appendChild(c);});}
+    drawWho();b.appendChild(who);
+    b.appendChild(el('div',{'class':'emocat'},'When should it play?'));
+    var tg=el('div',{'class':'rwtypes'});
+    function drawWhen(){tg.innerHTML='';MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
+      bt.addEventListener('click',function(){m.when=w[0];drawWhen();});tg.appendChild(bt);});}
+    drawWhen();b.appendChild(tg);
+    var foot=el('div',{'class':'pkfoot'});
+    foot.appendChild(sBtn('Next: record 🎙️','primary',function(){
+      if(m.when==='date'&&!m.date)m.date=today();if(m.when==='time'&&!m.time)m.time='07:30';
+      S.ov.remove();
+      openRecorder(m,function(url,secs){
+        m.secs=secs;
+        photoPut('msg|'+m.id,url,function(ok){if(!ok){alertMsg('Couldn\'t save the recording on this '+devWord()+'.');return;}
+          if(!existing)cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();});
+      });
+    }));
+    b.appendChild(foot);
+  }
+
   // ---- recorder ----
-  function openRecorder(onKeep){
+  function openRecorder(m,onKeep){
     var S=pkSheet('Record a message'),body=S.body,chunks=[],rec=null,stream=null,url=null,timer=null,secs=0,actx=null,raf=0;
+    // the script: read it out, flick to another idea, or say your own thing
+    var list=MSG_SCRIPTS[m.when]||MSG_SCRIPTS.day,si=0;
+    var sc=el('div',{'class':'script'}),st=el('div',{'class':'scriptt'});sc.appendChild(el('div',{'class':'scripth'},'💬 You could say:'));sc.appendChild(st);
+    var sn=el('div',{'class':'scriptnav'});
+    var nx=sBtn('Another idea ›','',function(){si=(si+1)%list.length;st.textContent=fillScript(list[si],m);});sn.appendChild(el('span',{'class':'muted'},'Or say it in your own words.'));sn.appendChild(nx);
+    sc.appendChild(sn);st.textContent=fillScript(list[0],m);body.appendChild(sc);
     var big=el('div',{'class':'recbig'}),tm=el('div',{'class':'rectime'},'0:00 / 0:30'),lvl=el('div',{'class':'reclvl'}),bar=el('div',{'class':'reclvlf'});lvl.appendChild(bar);
     var btn=el('button',{'class':'recbtn',title:'Record'});big.appendChild(btn);body.appendChild(big);body.appendChild(tm);body.appendChild(lvl);
-    var hint=el('p',{'class':'hint',style:'text-align:center'},'Tap the red button and talk. Up to 30 seconds.');body.appendChild(hint);
+    var hint=el('p',{'class':'hint',style:'text-align:center'},'Tap the red button and talk. Say their name, smile, and keep it short and happy (under 30 seconds).');body.appendChild(hint);
     var foot=el('div',{'class':'pkfoot'});body.appendChild(foot);
     function cleanup(){clearInterval(timer);cancelAnimationFrame(raf);try{if(stream)stream.getTracks().forEach(function(t){t.stop();});}catch(e){}try{if(actx)actx.close();}catch(e){}stream=null;actx=null;}
     var x=S.ov.querySelector('.tclose');x.addEventListener('click',cleanup);
@@ -3343,12 +3404,7 @@
   function setMessages(inner){
     sHead(inner,'Voice messages','Record a message, e.g. from Nana or Pop, and it plays when the moment comes: when they finish, on a special day, or as a surprise.');
     var nc=sCard();nc.classList.add('reccard');
-    nc.appendChild(sBtn('🎙️ Record a new message','primary big',function(){
-      openRecorder(function(url,secs){
-        var m={id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[],when:'day',repeat:'once',created:today(),secs:secs,played:{}};
-        photoPut('msg|'+m.id,url,function(ok){if(!ok){alertMsg('Couldn\'t save the recording on this '+devWord()+'.');return;}cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();});
-      });
-    }));
+    nc.appendChild(sBtn('🎙️ Record a new message','primary big',function(){newMessageFlow(null);}));
     nc.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Recordings stay on this '+devWord()+' only. They play out loud when Medo is open on the home screen.'));
     inner.appendChild(nc);
     var lc=sCard('Messages');
@@ -3364,7 +3420,7 @@
       var fe=emojiBtn(m.from.emoji||'👵',function(v){m.from.emoji=v;sv();},'people',function(){return m.from.name;});
       var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value;sv();sm.querySelector('.iname').textContent='From '+(fn.value||'…');});
       b.appendChild(sField('From','',[fe,fn]));
-      b.appendChild(sField('Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);})]));
+      b.appendChild(sField('Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);}),sBtn('🎙️ Record again','',function(){newMessageFlow(m);})]));
       var who=el('div',{'class':'chips'});
       cfg.kids.forEach(function(kd){var on=!m.kids||!m.kids.length||m.kids.indexOf(kd.id)>-1;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
         c.addEventListener('click',function(){var cur=msgKids(m).slice(),i=cur.indexOf(kd.id);if(i>-1){if(cur.length>1)cur.splice(i,1);}else cur.push(kd.id);m.kids=cur.length===nKids()?[]:cur;redraw();});who.appendChild(c);});
