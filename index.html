@@ -586,6 +586,8 @@
   .pkbtn{font-family:inherit;font-size:16px;font-weight:700;padding:9px 14px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff;cursor:pointer;white-space:nowrap}
   .pkbtn.empty{color:var(--muted);font-weight:600}.pkbtn:disabled{opacity:.45;cursor:default}
   .pksheet{max-width:560px}
+  .btn.dim{opacity:.45}
+  .sutimes .chip{font-size:20px;padding:12px 18px}
   .whyend{margin:14px 0 2px;text-align:center;font-weight:800;font-size:18px;color:#ffd23f}
   .emoov.pkov{align-items:center;padding:16px}
   .pkov .pksheet{border-radius:24px;max-height:calc(100vh - 32px);animation:pkPop .2s ease-out;box-shadow:0 12px 40px rgba(0,0,0,.5)}
@@ -689,7 +691,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · money said properly';
+  var BOARD_VERSION='15 Nov 2026 · setup without guesses';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -801,7 +803,7 @@
       var pm=(weekend?[]:['lunchbox']).concat(['reading','dishes','pyjamas']);
       days[d]={leave:weekend?'':'08:15',kids:[(weekend?we0:wk0).concat(pm),(weekend?we1:wk1).concat(pm)]};
     }
-    return {kids:[{name:'Big Kid',emoji:'🦊'},{name:'Little Kid',emoji:'🐢'}],steps:steps,days:days,voice:true,arvoStart:'12:00',v:2};
+    return {kids:[{name:'',emoji:'🦊'}],steps:steps,days:days,voice:true,arvoStart:'12:00',v:2};
   }
 
   // ---------- storage ----------
@@ -827,7 +829,7 @@
   }
   // v3: per-kid board style. Little one gets "one at a time" by default.
   if(cfg.v<3){
-    cfg.kids[0].mode=cfg.kids[0].mode||'grid';cfg.kids[1].mode=cfg.kids[1].mode||'nownext';
+    cfg.kids[0].mode=cfg.kids[0].mode||'grid';if(cfg.kids[1])cfg.kids[1].mode=cfg.kids[1].mode||'nownext';
     cfg.v=3;try{localStorage.setItem('qb_cfg',JSON.stringify(cfg));}catch(e){}
   }
   // v4: any number of children; per-child reading count and star jar (replaces streaks)
@@ -1299,7 +1301,8 @@
   var TIER_PTS=[1,3,6,10,15];     // level points for reaching each tier (running total)
   var MONTH_EM_S=['🎆','💝','🍀','🐣','🍂','⛄','🧣','🪁','🌸','🎃','🌻','🎄'];   // southern hemisphere seasons
   var MONTH_EM_N=['⛄','💝','🍀','🐣','🌼','🌞','🍦','🏖️','🍎','🎃','🍂','🎄'];   // northern hemisphere seasons
-  function monthEm(i){return ((cfg.loc&&cfg.loc.lat)<0?MONTH_EM_S:MONTH_EM_N)[i];}
+  function southern(){return cfg.loc&&cfg.loc.lat!=null?cfg.loc.lat<0:['AU','NZ','ZA','AR','CL','UY','PY','BR'].indexOf(localeRegion())>-1;}
+  function monthEm(i){return (southern()?MONTH_EM_S:MONTH_EM_N)[i];}
   var MONTH_NM=['January','February','March','April','May','June','July','August','September','October','November','December'];
   var HELP_IDS=['dishes','lunchbox','tidy','bed'];
   var LEVELS=[[0,'Rookie','🐣'],[3,'Explorer','🧭'],[8,'Adventurer','🎒'],[15,'Ranger','🏕️'],[25,'Hero','🦸'],[40,'Champion','🏅'],[60,'Superstar','🌟'],[85,'Legend','🐉'],[120,'Mythic','🦄'],[170,'Galaxy Master','🚀']];
@@ -1798,10 +1801,13 @@
   var setupStep=0,setupNames=null;
   function openSetup(){
     setupStep=0;
-    var defNames=['Big Kid','Little Kid'];
-    setupNames=cfg.kids.map(function(kd,i){return {id:kd.id,name:defNames.indexOf(kd.name)>-1?'':kd.name,emoji:kd.emoji,birthday:kd.birthday||''};});
+    var defNames=['','Big Kid','Little Kid'];
+    setupNames=cfg.kids.filter(function(kd){return defNames.indexOf(kd.name)<0;}).map(function(kd){return {id:kd.id,name:kd.name,emoji:kd.emoji,birthday:kd.birthday||''};});
+    if(!setupNames.length)setupNames=[{id:cfg.kids[0].id,name:'',emoji:cfg.kids[0].emoji,birthday:''}];
+    setupLeave='';
     document.getElementById('setupOv').classList.add('show');drawSetup();
   }
+  var setupLeave='';
   function closeSetup(done){stats(done?'setup-done':'setup-skipped',nKids()+' kids');document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();render();renderWx();fetchWx();}
   function applyKids(){
     // update, add or remove children to match the setup list
@@ -1832,7 +1838,7 @@
       body.appendChild(el('h1',null,'Welcome to Medo'));
       body.appendChild(el('p',{'class':'sulead'},'A morning and afternoon routine board kids run themselves. For kids: "I did it myself!" For grown-ups: routines they own.'));
       body.appendChild(el('p',{'class':'susub'},'Four quick questions and you\'re ready. You can change anything later in ⚙️ Settings.'));
-      nav.appendChild(skipAll);nav.appendChild(sBtn('Let\'s start','primary',next));
+      nav.appendChild(sBtn('Let\'s start','primary big',next));
     }
     else if(setupStep===1){
       body.appendChild(el('h2',null,'Who\'s using it?'));
@@ -1844,8 +1850,8 @@
         var grid=el('div',{'class':'avgrid sugrid'});grid.style.display='none';
         AVATARS.forEach(function(a){var b=el('button',{'class':a===r.emoji?'sel':''},a);b.addEventListener('click',function(){r.emoji=a;av.textContent=a;grid.style.display='none';});grid.appendChild(b);});
         av.addEventListener('click',function(){grid.style.display=grid.style.display==='none'?'':'none';});
-        var nm=el('input',{type:'text','class':'bigname',value:r.name,maxlength:'16',placeholder:'Child '+(i+1)+'\'s name'});
-        nm.addEventListener('input',function(){r.name=nm.value;});
+        var nm=el('input',{type:'text','class':'bigname',value:r.name,maxlength:'16',placeholder:i?'Next child\'s name':'Your child\'s name'});
+        nm.addEventListener('input',function(){r.name=nm.value;okKids();});
         var bdi=el('input',{type:'date',value:r.birthday||'',max:today(),title:'Birthday (optional)','class':'subday'});
         bdi.addEventListener('change',function(){r.birthday=bdi.value;});
         row.appendChild(av);row.appendChild(nm);row.appendChild(bdi);
@@ -1854,23 +1860,34 @@
       });
       if(setupNames.length<6){var add=el('button',{'class':'addcard'},'+ Add a child');add.addEventListener('click',function(){
         var used=setupNames.map(function(x){return x.emoji;});setupNames.push({id:null,name:'',emoji:AVATARS.filter(function(a){return used.indexOf(a)<0;})[0]||'⭐'});drawSetup();});body.appendChild(add);}
-      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',function(){applyKids();next();}));
+      var kn=sBtn('Next','primary',function(){if(!okKids())return;applyKids();next();});
+      var okKids=function(){var ok=setupNames.every(function(r){return r.name.trim();});kn.classList.toggle('dim',!ok);return ok;};
+      nav.appendChild(sBtn('Back','',back));nav.appendChild(kn);okKids();
     }
     else if(setupStep===2){
       body.appendChild(el('h2',null,'Where do you live?'));
-      body.appendChild(el('p',{'class':'susub'},'For "What should I wear?" and the sunscreen reminder.'));
-      var cur=el('p',{'class':'sucur'},'📍 '+(cfg.loc.name||'Frankston'));body.appendChild(cur);
-      body.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);cur.textContent='📍 '+pl.name+' ✓';}));
-      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',next));
+      body.appendChild(el('p',{'class':'susub'},'For "What should I wear?" and sunscreen reminders.'));
+      var cur=el('p',{'class':'sucur'},hasHome()?'📍 '+cfg.loc.name+' ✓':'');body.appendChild(cur);
+      var ln=sBtn('Next','primary',function(){if(hasHome())next();});ln.classList.toggle('dim',!hasHome());
+      body.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);cur.textContent='📍 '+pl.name+' ✓';ln.classList.remove('dim');}));
+      var nw=el('button',{'class':'suskip',style:'align-self:flex-start'},'Skip, I don\'t need the weather');nw.addEventListener('click',next);body.appendChild(nw);
+      nav.appendChild(sBtn('Back','',back));nav.appendChild(ln);
     }
     else if(setupStep===3){
       body.appendChild(el('h2',null,'What time do you leave on school days?'));
       body.appendChild(el('p',{'class':'susub'},'A little runner counts down on the board so the kids can see how long is left. Monday to Friday; change single days later.'));
-      var cur3=cfg.days[1].leave||'08:15';
-      var ti=el('input',{type:'time',value:cur3,'class':'sutime',required:'required'});body.appendChild(ti);
+      var chips=el('div',{'class':'chips sutimes'});
+      var ti=el('input',{type:'time',value:setupLeave});
+      var tn=sBtn('Next','primary',function(){if(!setupLeave)return;for(var d=1;d<=5;d++)cfg.days[d].leave=setupLeave;sv();next();});
+      var mark=function(){[].forEach.call(chips.children,function(c){c.classList.toggle('on',c.dataset.t===setupLeave);});tn.classList.toggle('dim',!setupLeave);};
+      ['08:00','08:15','08:30','08:45'].forEach(function(t){var c=el('button',{'class':'chip'},pkTimeText(t));c.dataset.t=t;
+        c.addEventListener('click',function(){setupLeave=t;ti.value=t;ti.dispatchEvent(new Event('change'));mark();});chips.appendChild(c);});
+      body.appendChild(chips);
+      var orow=el('div',{'class':'row',style:'align-items:center;gap:10px;justify-content:flex-start'});orow.appendChild(el('span',{'class':'susub'},'Or another time:'));orow.appendChild(ti);
+      ti.addEventListener('change',function(){if(ti.value){setupLeave=ti.value;mark();}});body.appendChild(orow);
       var none=el('button',{'class':'suskip',style:'align-self:flex-start'},'We don\'t leave at a set time');
       none.addEventListener('click',function(){for(var d=1;d<=5;d++)cfg.days[d].leave='';sv();next();});body.appendChild(none);
-      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',function(){if(ti.value){for(var d=1;d<=5;d++)cfg.days[d].leave=ti.value;sv();}next();}));
+      nav.appendChild(sBtn('Back','',back));nav.appendChild(tn);mark();
     }
     else{
       body.appendChild(el('h2',null,'Can you hear me?'));
@@ -2861,7 +2878,7 @@
       (function drawLoc(){
         lcBox.innerHTML='';
         var cur=el('div',{'class':'row'});
-        cur.appendChild(el('span',null,ev.loc?'📍 '+ev.loc.name:'🏠 Home ('+(cfg.loc.name||'Frankston').split(',')[0]+')'));
+        cur.appendChild(el('span',null,ev.loc?'📍 '+ev.loc.name:(cfg.loc.name?'🏠 Home ('+cfg.loc.name.split(',')[0]+')':'🏠 Home')));
         if(ev.loc)cur.appendChild(sBtn('Use home','',function(){delete ev.loc;sv();wxLocChanged();drawLoc();}));
         lcBox.appendChild(cur);
         lcBox.appendChild(placeSearch('Away somewhere? Type the town',function(pl){ev.loc=pl;sv();wxLocChanged();drawLoc();}));
@@ -3167,12 +3184,6 @@
     }
     q.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
     row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));
-    if(navigator.geolocation)row.appendChild(sBtn('📍 Use my location','',function(){
-      results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Finding you…'));
-      navigator.geolocation.getCurrentPosition(function(pos){results.innerHTML='';
-        onPick({name:'My location',lat:+pos.coords.latitude.toFixed(3),lon:+pos.coords.longitude.toFixed(3),cc:'',admin1:''});},
-        function(){results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t get your location. Type your town instead.'));},{timeout:15000,maximumAge:3600000});
-    }));
     wrap.appendChild(row);wrap.appendChild(results);
     return wrap;
   }
@@ -3188,7 +3199,7 @@
   function setWeather(inner){
     sHead(inner,'Weather');
     var lc=sCard('Location');
-    var curName=el('b',null,cfg.loc.name||'Frankston');
+    var curName=el('b',null,cfg.loc.name||'Not set');
     var cur=el('div',{'class':'row'});cur.appendChild(el('span',{'class':'muted'},'Currently:'));cur.appendChild(curName);lc.appendChild(cur);
     lc.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);curName.textContent=pl.name;}));
     inner.appendChild(lc);
@@ -4065,7 +4076,7 @@
     return pick(e,[n+' more sleeps until '+nm+'!',nm+' is in '+n+' sleeps!','Only '+n+' more sleeps, then it\'s '+nm+'!']);
   }
   // ---------- weather & what to wear ----------
-  if(!cfg.loc)cfg.loc={name:'Frankston',lat:-38.14,lon:145.12};
+  if(!cfg.loc)cfg.loc={name:'',lat:null,lon:null};
   var wx=load('qb_wx',null);
   var BANDS=[ // by today's top temperature
     {min:27,name:'Hot day',colour:'#ff5e5e',word:'red',bottoms:{shorts:['🩳','Shorts'],dress:['👗','Dress or skirt']},wear:[['👕','T-shirt']]},
@@ -4099,14 +4110,15 @@
     return {band:band,wear:wear.concat(extras)};
   }
   // ----- Where are we? Home, unless an event with its own location is on today -----
+  function hasHome(){return !!(cfg.loc&&cfg.loc.lat!=null&&cfg.loc.lon!=null);}
   function wxLoc(){
     var t=today0();
     for(var i=0;i<(cfg.events||[]).length;i++){var ev=cfg.events[i];
       if(ev.loc&&ev.loc.lat!=null&&occursOn(ev,t))return {name:ev.loc.name,lat:ev.loc.lat,lon:ev.loc.lon,away:true,emoji:ev.emoji||'📍',ev:ev.name||''};}
-    return {name:cfg.loc.name,lat:cfg.loc.lat,lon:cfg.loc.lon,away:false};
+    return hasHome()?{name:cfg.loc.name,lat:cfg.loc.lat,lon:cfg.loc.lon,away:false}:null;
   }
   function locKey(L){return (+L.lat).toFixed(3)+','+(+L.lon).toFixed(3);}
-  function wxLocOK(){return !!(wx&&wx.lk===locKey(wxLoc()));}
+  function wxLocOK(){var L=wxLoc();return !!(wx&&L&&wx.lk===locKey(L));}
   function wxLocChanged(){if(!wxLocOK()){wx=null;renderWx();fetchWx();}}
   // ----- UV helpers -----
   function uvLimit(){return cfg.uvLimit||3;}
@@ -4184,6 +4196,8 @@
   function renderWx(){
     renderUV();
     var box=document.getElementById('wx');
+    box.style.display=wxLoc()?'':'none';   // no town set: no weather card
+    if(!wxLoc())return;
     if(!wx||wx.date!==today()){
       box.classList.add('off');box.style.removeProperty('--wc');
       var offline=navigator.onLine===false||wxErr==='offline';
@@ -4281,7 +4295,7 @@
   var wxBusy=null;
   function fetchWx(){ // returns a promise: true when fresh weather arrived
     if(wxBusy)return wxBusy;
-    var L=wxLoc();
+    var L=wxLoc();if(!L){renderWx();return Promise.resolve(false);}
     var url='https://api.open-meteo.com/v1/forecast?latitude='+L.lat+'&longitude='+L.lon+
       '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weather_code,wind_speed_10m_max,wind_gusts_10m_max'+
       '&hourly=uv_index,weather_code,precipitation_probability,precipitation&timezone=auto&forecast_days=2';

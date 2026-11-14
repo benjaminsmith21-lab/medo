@@ -19,7 +19,7 @@ module.exports=function(){
   const created=ymd(day(29));
   const cfg={v:8,kids:[{id:'kA',name:'Ava',emoji:'🦊',reads:{count:40,last:'',prev:''},stars:{count:12,last:'',prev:''}},{id:'kB',name:'Leo',emoji:'🐢',reads:{count:10,last:'',prev:''},stars:{count:3,last:'',prev:''}}],
     steps:['toilet','dress','breakfast','teeth','hair','shoes'].map(i=>({id:i,emoji:{toilet:'🚽',dress:'👕',breakfast:'🥣',teeth:'🪥',hair:'🪮',shoes:'👟'}[i],label:{toilet:'Toilet & wash hands',dress:'Get dressed',breakfast:'Eat breakfast',teeth:'Brush teeth',hair:'Brush hair',shoes:'Shoes & hat'}[i]})).concat([{id:'reading',emoji:'📖',label:'Reading',period:'pm'},{id:'dishes',emoji:'🍽️',label:'Put dishes away',period:'pm'},{id:'pyjamas',emoji:'🛌',label:'Get pyjamas ready',period:'pm'}]),
-    days:{},voice:true,arvoStart:'23:59',holidays:{on:false,state:'VIC',lead:14},specials:{},events:[],
+    days:{},voice:true,loc:{name:'Testville',lat:-33.87,lon:151.21},arvoStart:'23:59',holidays:{on:false,state:'VIC',lead:14},specials:{},events:[],
     rewards:[
       {id:'r1',emoji:'🦷',prize:'Sticker',kids:['kA'],type:'quest',quest:'teeth',n:7,frame:'row',repeat:'every',show:true,created},
       {id:'r2',emoji:'🍕',prize:"Choose what's for dinner",kids:[],type:'allday',n:3,frame:'week',repeat:'every',show:true,created},

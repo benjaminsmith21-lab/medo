@@ -326,3 +326,23 @@ test('the money jar is spoken in words, and an empty jar says so',async()=>{
   await wait(300);t2.d.querySelector('.pill.troph').click();t2.d.querySelector('.rwcard.jar').click();
   assert.match(t2.lastSaid(),/You have 2 dollars and 50 cents in your money jar/);t2.close();
 });
+
+test('first-run setup assumes nothing: no default children, town or leave time',async()=>{
+  const t=boot({blank:true});await wait(4000);
+  assert.ok(!t.fetches.some(u=>/api\.open-meteo\.com\/v1\/forecast/.test(u)),'no weather lookup before a town is chosen');
+  assert.equal(t.d.getElementById('wx').style.display,'none');
+  const ov=t.d.getElementById('setupOv');
+  assert.ok(!t.button('Skip setup',ov),'no skip-everything button');
+  t.button("Let's start",ov).click();
+  assert.equal(ov.querySelectorAll('.sukid').length,1,'one child to start');
+  const nm=ov.querySelector('.bigname');assert.equal(nm.value,'');
+  t.button('Next',ov).click();assert.ok(ov.querySelector('.bigname'),'needs a name before moving on');
+  nm.value='Mia';nm.dispatchEvent(new t.w.Event('input'));t.button('Next',ov).click();
+  assert.doesNotMatch(ov.textContent,/Frankston/);
+  t.button("Skip, I don't need the weather",ov).click();
+  assert.ok(!ov.querySelector('.sutimes .chip.on'),'no leave time picked for them');
+  t.button('Next',ov).click();assert.ok(ov.querySelector('.sutimes'),'needs a time or "no set time"');
+  t.button('8:30',ov).click();t.button('Next',ov).click();
+  const c=t.cfg();assert.equal(c.kids.length,1);assert.equal(c.kids[0].name,'Mia');assert.equal(c.days[1].leave,'08:30');assert.equal(c.loc.lat,null);
+  t.close();
+});
