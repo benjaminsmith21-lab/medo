@@ -689,7 +689,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · drops of rain';
+  var BOARD_VERSION='14 Nov 2026 · money said properly';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1271,6 +1271,14 @@
   var CUR={AU:'AUD',NZ:'NZD',US:'USD',GB:'GBP',CA:'CAD',IE:'EUR',DE:'EUR',FR:'EUR',ES:'EUR',IT:'EUR',NL:'EUR',BE:'EUR',AT:'EUR',FI:'EUR',PT:'EUR',GR:'EUR',LU:'EUR',ZA:'ZAR',SG:'SGD',IN:'INR',JP:'JPY',HK:'HKD',MY:'MYR',PH:'PHP',SE:'SEK',NO:'NOK',DK:'DKK',CH:'CHF',PL:'PLN',BR:'BRL',MX:'MXN',AE:'AED'};
   function curCode(){return CUR[(cfg.holidays&&cfg.holidays.country)||localeRegion()]||'USD';}
   function money(n){n=+n||0;try{return new Intl.NumberFormat(navigator.language||'en-AU',{style:'currency',currency:curCode(),currencyDisplay:'narrowSymbol',minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}).format(n);}catch(e){return '$'+n.toFixed(n%1?2:0);}}
+  // for the voice: "2 dollars and 50 cents", never "$2.50" (speech reads "$0" as "dollar zero")
+  var CUR_WORDS={AUD:['dollar','cent'],NZD:['dollar','cent'],USD:['dollar','cent'],CAD:['dollar','cent'],SGD:['dollar','cent'],HKD:['dollar','cent'],
+    EUR:['euro','cent'],GBP:['pound','penny','pence'],ZAR:['rand','cent'],JPY:['yen'],INR:['rupee','paisa','paise']};
+  function moneySay(n){n=Math.round((+n||0)*100)/100;var w=CUR_WORDS[curCode()];if(!w)return money(n);
+    var whole=Math.floor(n),c=Math.round((n-whole)*100);
+    function pl(k,word,plural){return k+' '+(k===1?word:(plural||(word==='yen'||word==='rand'?word:word+'s')));}
+    var out=[];if(whole||!c)out.push(pl(whole,w[0]));if(c&&w[1])out.push(pl(c,w[1],w[2]));return out.join(' and ');}
+  function rwPrizeSay(rw){return rw.kind==='money'?moneySay(rw.amount||0)+' of pocket money':(rw.prize||'');}
   function rwPrize(rw){return rw.kind==='money'?money(rw.amount||0)+' pocket money':(rw.prize||'');}
   function kidMoney(kd){if(!kd.money)kd.money={bal:0,log:[]};return kd.money;}
   function moneyMove(kd,amt,what){var m=kidMoney(kd);m.bal=Math.round((m.bal+amt)*100)/100;if(m.bal<0)m.bal=0;m.log.push({d:today(),amt:amt,what:what});if(m.log.length>200)m.log=m.log.slice(-200);sv();}
@@ -1482,12 +1490,12 @@
       waitMine.forEach(function(x){
         var t=el('button',{'class':'rwcard waiting'});t.appendChild(el('span',{'class':'rwce'},x.rw.kind==='money'?'💰':(x.rw.emoji||'🎁')));
         t.appendChild(el('b',null,rwPrize(x.rw)));t.appendChild(el('span',null,'Ask a grown-up!'));
-        t.addEventListener('click',function(){bumpIdle();say('You earned '+rwPrize(x.rw)+'! Go and tell a grown-up!');});rrow.appendChild(t);
+        t.addEventListener('click',function(){bumpIdle();say('You earned '+rwPrizeSay(x.rw)+'! Go and tell a grown-up!');});rrow.appendChild(t);
       });
       if(usesMoney){
         var jar=el('button',{'class':'rwcard jar'});jar.appendChild(el('span',{'class':'rwce'},'💰'));jar.appendChild(el('b',null,money(mj.bal)));jar.appendChild(el('span',null,'in my money jar'));
         jar.addEventListener('click',function(){bumpIdle();var last=mj.log[mj.log.length-1];
-          say('You have '+money(mj.bal)+' in your money jar!'+(last?(last.amt>=0?' Last time you got '+money(last.amt)+'.':' Last time you spent '+money(-last.amt)+(last.what&&last.what!=='Spent'?' on '+last.what:'')+'.'):''));});
+          say((mj.bal>0?'You have '+moneySay(mj.bal)+' in your money jar!':'Your money jar is empty right now. Keep doing your quests to fill it up!')+(last?(last.amt>=0?' Last time you got '+moneySay(last.amt)+'.':' Last time you spent '+moneySay(-last.amt)+(last.what&&last.what!=='Spent'?' on '+last.what:'')+'.'):''));});
         rrow.appendChild(jar);
       }
       rs.appendChild(rrow);
@@ -2001,7 +2009,7 @@
       save('qb_cfg',cfg);
       recordToday();
       var newRw=rewardsFor(k).filter(function(x){return x.p.earned&&rwBefore.indexOf(x.rw.id)<0;})[0];
-      if(newRw)lines.push(newRw.rw.kind==='money'?'And you earned '+money(newRw.rw.amount)+' for your money jar! Tell a grown-up!':'And you earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');
+      if(newRw)lines.push(newRw.rw.kind==='money'?'And you earned '+moneySay(newRw.rw.amount)+' for your money jar! Tell a grown-up!':'And you earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');
       var newB=trophOn()?updTrophies(k).news:[];
       if(newB.length)lines.push('You won a new badge: '+newsTitle(newB[0])+'!'+(newB.length>1?' And '+(newB.length-1)+' more!':'')+' Look in your trophy case.');
       if(newRw&&!milestone){bigFanfare();confetti(k,['🎁','🎉','⭐','🏆','✨']);showBanner(newRw.rw.kind==='money'?'💰':(newRw.rw.emoji||'🎁'),kd.name+' earned: '+rwPrize(newRw.rw)+'!');}

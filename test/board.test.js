@@ -313,3 +313,16 @@ test('rain is spoken by part of the day, not just "it will rain"',async()=>{
   else assert.doesNotMatch(said,/rain/);
   t.close();
 });
+
+test('the money jar is spoken in words, and an empty jar says so',async()=>{
+  const t=boot({cfg:c=>{c.holidays=c.holidays||{};c.holidays.country='AU';c.rewards.push({id:'r9',kind:'money',amount:2,prize:'',kids:['kA'],type:'stars',n:500,frame:'since',repeat:'every',show:true,created:c.rewards[0].created});}});
+  await wait(300);
+  t.d.querySelector('.pill.troph').click();
+  t.d.querySelector('.rwcard.jar').click();
+  assert.match(t.lastSaid(),/money jar is empty/);assert.doesNotMatch(t.lastSaid(),/\$/);
+  t.d.querySelector('.tclose').click();
+  t.close();
+  const t2=boot({cfg:c=>{c.holidays=c.holidays||{};c.holidays.country='AU';c.kids[0].money={bal:2.5,log:[]};c.rewards.push({id:'r9',kind:'money',amount:2,prize:'',kids:['kA'],type:'stars',n:500,frame:'since',repeat:'every',show:true,created:c.rewards[0].created});}});
+  await wait(300);t2.d.querySelector('.pill.troph').click();t2.d.querySelector('.rwcard.jar').click();
+  assert.match(t2.lastSaid(),/You have 2 dollars and 50 cents in your money jar/);t2.close();
+});
