@@ -689,7 +689,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · clearer weather talk';
+  var BOARD_VERSION='14 Nov 2026 · drops of rain';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -4226,7 +4226,7 @@
     var real=ra.filter(rainReal),drops=ra.filter(rainDrops),day=ra.filter(function(x){return x.day;});
     if(real.length&&real.length===day.length&&day.length>1)return real.every(function(x){return x.p>=70;})?'it will rain all day':'it might rain all day';
     var bits=ra.filter(function(x){return rainReal(x)||rainDrops(x);}).map(function(x){
-      return (rainReal(x)?(x.p>=70?'it will rain ':'it might rain '):'there might be a few drops ')+x.w;});
+      return (rainReal(x)?(x.p>=70?'it will rain ':'it might rain '):'there might be a few drops of rain ')+x.w;});
     return joinWords(bits);
   }
   function rainSub(){   // for the card: "rain 90% after lunch"
