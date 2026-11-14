@@ -191,7 +191,7 @@
   .s-nav button.sel{background:#2f3670;color:#fff}
   .s-body{flex:1;overflow-y:auto;padding:20px 22px 40px;display:block}
   .s-inner{max-width:860px;width:100%;min-width:0;margin:0 auto}
-  .stitle{margin:0 0 4px;font-size:28px}
+  .stitle{margin:0 0 16px;font-size:28px}
   .ssub{color:var(--muted);font-size:16px;margin:0 0 16px}
   .scard{background:var(--bg2);border-radius:18px;padding:16px 18px;margin-bottom:14px}
   .scard>h3{margin:0 0 2px;font-size:20px;color:#fff}
@@ -683,7 +683,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · one message per child';
+  var BOARD_VERSION='14 Nov 2026 · tidier wording';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1688,12 +1688,13 @@
     photoDel(photoKey(date,kid,stepId));render();
   }
   function proofCard(inner){
-    var c=sCard('📸 Proof check','Ticks with a photo or a grown-up OK from the last '+PHOTO_DAYS+' days. Not good enough? Tap it and untick it. Photos stay on this '+devWord()+' only and delete themselves after '+PHOTO_DAYS+' days.');
+    var c=sCard('📸 Proof check','Last '+PHOTO_DAYS+' days. Tap one to untick it.');
     var items=[],t0=today0();
     for(var n=0;n<PHOTO_DAYS;n++){var ds=ymd(addDays(t0,-n));
       for(var k=0;k<nKids();k++){var r=histRec(ds,kidId(k));if(r&&r.proof)for(var id in r.proof)if(r.done.indexOf(id)>-1)items.push({date:ds,k:k,id:id,type:r.proof[id]});}}
     var any=cfg.steps.some(function(s){return s.proof;});
-    if(!items.length){c.appendChild(el('p',{'class':'muted'},any?'Nothing to check yet.':'No quests ask for proof yet. Turn it on for a quest in Quests → Edit quests → Proof.'));inner.appendChild(c);return;}
+    if(!any&&!items.length)return;  // nothing uses proof: no card
+    if(!items.length){c.appendChild(el('p',{'class':'muted'},'Nothing to check yet.'));inner.appendChild(c);return;}
     var grid=el('div',{'class':'pfgrid'});c.appendChild(grid);inner.appendChild(c);
     photoAll(function(urls){
       items.forEach(function(it){
@@ -1753,17 +1754,10 @@
   function markTip(id){tips[id]=1;save('qb_tips',tips);}
   // ---- settings tips: one line per tab, shown until closed ----
   var TAB_TIPS={
-    children:'Each child gets their own card. Tap the picture to change it. "One at a time" shows one big quest at a time, which suits little ones.',
-    quests:'"Plan the week" picks which quests each child does on each day. "Edit quests" changes the quests themselves, their order, and whether they need a photo or a grown-up OK.',
-    leaving:'Set what time you leave each day. The runner moves along the road as the time gets closer, and tapping it shows a talking clock.',
-    events:'Birthdays, holidays, sport and playdates. The board counts down to them, can add a quest on the day (like "Swim bag"), and can use a holiday town\'s weather.',
-    rewards:'Make rules like "Brush teeth 7 days in a row → sticker". The board counts for you and tells you when to hand it over. Tap an idea at the bottom to start.',
-    progress:'How each child is going over time, and photos or grown-up OKs to check. It fills in day by day from when the board was first used.',
-    weather:'Your town powers "What should I wear?" and the automatic sunscreen quest.',
-    sound:'Pick the voice. The natural voice downloads once (about 60 MB) and then works offline.',
-    device:'Install the board as an app, make a backup code, or bring back these tips.',
-    messages:'Hand the tablet to a grandparent and tap the red button. Their message can play when the kids finish their morning, on a birthday, or as a surprise.',
-    about:'The story behind Medo, and a way to send ideas or report a problem. Every message is read.'
+    quests:'"Plan the week" sets who does what each day. "Edit quests" changes the quests.',
+    leaving:'The runner heads for the car as leaving time gets closer. Tap it for the talking clock.',
+    rewards:'Pick an idea below to start. The board counts and tells you when it\'s earned.',
+    messages:'Hand the tablet to a grandparent and tap the red button.'
   };
   function tipCard(inner,tab){
     if(tipSeen('tab:'+tab)||!TAB_TIPS[tab])return;
@@ -2351,7 +2345,7 @@
 
   // ---------- Children ----------
   function setChildren(inner){
-    sHead(inner,'Children','Who uses the board. Each child gets their own card on the home screen.');
+    sHead(inner,'Children');
     cfg.kids.forEach(function(kid,k){
       var c=sCard();
       var top=el('div',{'class':'kidtop'});
@@ -2376,11 +2370,11 @@
       function bdText(){if(!kid.birthday){bdNote.textContent='';return;}var t0=today0(),o=nextOccurrence({date:kid.birthday,repeat:'birthday'},t0),dd=daysBetween(t0,o),ag=o.getFullYear()-parseD(kid.birthday).getFullYear();
         bdNote.textContent=dd===0?'🎉 Turns '+ag+' today!':'Turns '+ag+' in '+dd+(dd===1?' day':' days');}
       bd.addEventListener('change',function(){kid.birthday=bd.value;sv();bdText();});bdText();
-      c.appendChild(sField('🎂 Birthday','Adds a countdown to Events, plus party colours and a crown on their card on the day. Only this child gets the crown, even if a friend has the same name.',[bd,bdNote]));
+      c.appendChild(sField('🎂 Birthday','For a countdown and a party on the day.',[bd,bdNote]));
       c.appendChild(sField('Board style','How their quests are shown.',[sSeg([['nownext','One at a time'],['grid','All at once']],kid.mode||'grid',function(v){kid.mode=v;sv();})]));
       c.appendChild(sField('Warm-day clothes','What "What should I wear?" suggests for them.',[sSeg([['shorts','Shorts'],['dress','Dresses & skirts'],['both','Both']],kid.clothes||'shorts',function(v){kid.clothes=v;sv();})]));
-      c.appendChild(sField('📚 Days of reading','Set where they are up to. Ticking Reading adds one each day.',[sNum(kid.reads.count||0,0,function(v){kid.reads.count=v;sv();},110)]));
-      c.appendChild(sField('⭐ Stars in the star jar','A star is added when every quest for the day is done.',[sNum(kid.stars.count||0,0,function(v){kid.stars.count=v;sv();},110)]));
+      c.appendChild(sField('📚 Days of reading','Ticking Reading adds one a day.',[sNum(kid.reads.count||0,0,function(v){kid.reads.count=v;sv();},110)]));
+      c.appendChild(sField('⭐ Stars in the star jar','One per day with every quest done.',[sNum(kid.stars.count||0,0,function(v){kid.stars.count=v;sv();},110)]));
       inner.appendChild(c);
     });
     var add=el('button',{'class':'addcard'},'+ Add a child');
@@ -2392,7 +2386,6 @@
       normalize();ensureProg();sv();renderSettings();
     });
     inner.appendChild(add);
-    inner.appendChild(el('p',{'class':'ssub'},'A new child starts with the same quests as the first child. Change them in Quests.'));
   }
 
   // ================= Our own time and date pickers (no Android pop-ups) =================
@@ -2546,7 +2539,7 @@
 
   // ---------- Quests ----------
   function setQuests(inner){
-    sHead(inner,'Quests','Choose which jobs each child does on each day, and edit the jobs themselves.');
+    sHead(inner,'Quests');
     inner.appendChild(sSeg([['days','Plan the week'],['list','Edit quests']],sQuestView,function(v){sQuestView=v;renderSettings();}));
     inner.appendChild(el('div',{style:'height:12px'}));
     if(sQuestView==='days')setQuestDays(inner);else setQuestList(inner);
@@ -2610,7 +2603,7 @@
         var t=el('div',{style:'flex:1;min-width:0'});
         var when=over.length===7?'every day':(over.length===5&&over.indexOf(0)<0&&over.indexOf(6)<0)?'on weekdays':'on '+over.map(function(d){return SHORT[d];}).join(', ');
         t.appendChild(el('b',null,kd.emoji+' '+kd.name+' has up to '+most+' '+per[1]+' quests '+when));
-        t.appendChild(el('p',null,'Around '+lim+' or fewer suits most '+(age!=null?age+'-year-olds':'kids this age')+'. Long lists can feel like too much, and the morning turns back into reminders. You know '+kd.name+' best, so this is just a heads-up.'));
+        t.appendChild(el('p',null,'Around '+lim+' or fewer suits most '+(age!=null?age+'-year-olds':'kids this age')+'. Long lists tend to turn back into reminders.'));
         var acts=el('div',{'class':'row'});
         if(kd.mode!=='nownext')acts.appendChild(sBtn('Show one at a time for '+kd.name,'',function(){kd.mode='nownext';sv();render();loadNotes(box);}));
         acts.appendChild(sBtn('Don\'t show again for '+kd.name,'',function(){kd.noLoadNote=true;sv();loadNotes(box);}));
@@ -2646,7 +2639,7 @@
         tb.appendChild(tr);
       });
     });
-    dayCard.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Drag ⠿ to change the order quests appear on the board.'));
+    dayCard.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Drag ⠿ to reorder.'));
     var notes=el('div',{'class':'loadnotes'});
     function refreshCounts(){
       [].forEach.call(tbl.querySelectorAll('.qcount'),function(c){var k=+c.dataset.k,kd=cfg.kids[k],n=questCount(sDay,k,c.dataset.per),over=n>questLimit(kd)&&!kd.noLoadNote;
@@ -2663,12 +2656,11 @@
     var tcard=sCard();
     var at=el('input',{type:'time',value:cfg.arvoStart||'12:00'});
     at.addEventListener('change',function(){if(at.value){cfg.arvoStart=at.value;selPeriod=null;sv();}});
-    tcard.appendChild(sField('Afternoon starts at','The board switches from Morning to Afternoon quests at this time, every day.',[at]));
-    tcard.appendChild(el('p',{'class':'hint'},'Leaving times and the countdown are in 🚗 Leaving.'));
+    tcard.appendChild(sField('Afternoon starts at','',[at]));
     inner.appendChild(tcard);
   }
   function setQuestList(inner){
-    var addc=sCard('Add a quest','It starts switched off. Turn it on for each child in "Plan the week".');
+    var addc=sCard('Add a quest','Turn it on per child in Plan the week.');
     var row=el('div',{'class':'row'});
     var newEmo='';
     var nl=el('input',{type:'text',placeholder:'e.g. Feed the dog',maxlength:'28',style:'flex:1;min-width:160px'});
@@ -2678,7 +2670,7 @@
     row.appendChild(sBtn('Add','primary',function(){if(!nl.value.trim())return;cfg.steps.push({id:'s'+Date.now(),emoji:newEmo||'⭐',label:nl.value.trim(),period:per});sv();renderSettings();}));
     addc.appendChild(row);inner.appendChild(addc);
     [['am','🌅 Morning quests'],['pm','☀️ Afternoon quests']].forEach(function(pp){
-      var c=sCard(pp[1],'Tap a quest to edit it. Drag ⠿ to change the order on the board.');
+      var c=sCard(pp[1],'Drag ⠿ to reorder.');
       var list=cfg.steps.filter(function(s){return stepPeriod(s)===pp[0];});
       var box=el('div',{'class':'sortbox'});c.appendChild(box);
       makeSortable(box,'details.item',function(ids){reorderPeriod(pp[0],ids);});
@@ -2693,8 +2685,8 @@
         b.appendChild(sField('Part of the day','',[sSeg([['am','Morning'],['pm','Afternoon']],stepPeriod(s),function(v){s.period=v;sv();renderSettings();})]));
         var sy=el('input',{type:'text',value:s.say||'',placeholder:pastPhrase({id:s.id,label:s.label}),style:'flex:1;min-width:200px'});
         sy.addEventListener('input',function(){s.say=sy.value.replace(/,?\s*(superstar|champ|legend|great job|well done|nice work)!?$/i,'');sv();});
-        b.appendChild(sField('What the voice says','Leave blank to use the suggestion. "Superstar!" etc. is added for you.',[sy,sBtn('▶','',function(){var v=cfg.voice;cfg.voice=true;say(praiseLine(s));cfg.voice=v;})]));
-        b.appendChild(sField('Proof','Photo: they take a picture to tick it, e.g. a made bed. Grown-up: a grown-up holds a button to OK it. Either way it ticks straight away; check later on the Progress tab.',[sSeg([['','None'],['photo','📸 Photo'],['parent','🙋 Show a grown-up']],s.proof||'',function(v){s.proof=v;sv();})]));
+        b.appendChild(sField('What the voice says','Leave blank to use the suggestion.',[sy,sBtn('▶','',function(){var v=cfg.voice;cfg.voice=true;say(praiseLine(s));cfg.voice=v;})]));
+        b.appendChild(sField('Proof','Photo: they snap a picture. Grown-up: you hold a button to OK it. Check them in Progress.',[sSeg([['','None'],['photo','📸 Photo'],['parent','🙋 Show a grown-up']],s.proof||'',function(v){s.proof=v;sv();})]));
         var acts=el('div',{'class':'row',style:'margin-top:8px'});
         acts.appendChild(el('span',{style:'flex:1'}));
         acts.appendChild(sConfirm('Delete quest','Tap again to delete','linkbtn',function(){
@@ -2716,38 +2708,38 @@
     return g;
   }
   function setLeaving(inner){
-    sHead(inner,'Leaving','The countdown to getting out the door, and the talking clock.');
-    var tc=sCard('Leaving times','Turn off days with no rush, like weekends.');
+    sHead(inner,'Leaving');
+    var tc=sCard('Leaving times','');
     [1,2,3,4,5,6,0].forEach(function(d){
       var day=cfg.days[d];
       var tm=el('input',{type:'time',value:day.leave||'08:15',required:'required'});tm.disabled=!day.leave;
       tm.addEventListener('change',function(){if(tm.value){day.leave=tm.value;sv();}});
-      tc.appendChild(sField(DAYS[d]+(d===new Date().getDay()?' (today)':''),day.leave?'':'No countdown',[tm,sSwitch(!!day.leave,function(on){day.leave=on?(tm.value||'08:15'):'';tm.disabled=!on;sv();renderSettings();})]));
+      tc.appendChild(sField(DAYS[d]+(d===new Date().getDay()?' (today)':''),'',[tm,sSwitch(!!day.leave,function(on){day.leave=on?(tm.value||'08:15'):'';tm.disabled=!on;sv();renderSettings();})]));
     });
     inner.appendChild(tc);
     var cc=sCard('Countdown at the top of the board');
-    cc.appendChild(sField('Starts','How long before leaving the runner sets off.',[sSeg([['30','30 min'],['45','45 min'],['60','1 hour'],['90','1½ hours']],String(cfg.leave.window||60),function(v){cfg.leave.window=+v;sv();})]));
+    cc.appendChild(sField('Starts','',[sSeg([['30','30 min'],['45','45 min'],['60','1 hour'],['90','1½ hours']],String(cfg.leave.window||60),function(v){cfg.leave.window=+v;sv();})]));
     cc.appendChild(sField('Who runs','',[sSeg([['🏃','🏃 Person'],['🏃‍♀️','🏃‍♀️ Girl'],['🏃‍♂️','🏃‍♂️ Boy'],['kids','Our characters']],cfg.runner.fig,function(v){cfg.runner.fig=v;sv();})]));
-    cc.appendChild(sField('Flip the runner','Turn on if they look like they\'re running away.',[sSwitch(cfg.runner.flip,function(v){cfg.runner.flip=v;sv();})]));
+    cc.appendChild(sField('Flip the runner','',[sSwitch(cfg.runner.flip,function(v){cfg.runner.flip=v;sv();})]));
     var custom=el('input',{type:'text','class':'emo',maxlength:'4',placeholder:'✏️',value:DESTS.some(function(x){return x[0]===cfg.leave.dest;})?'':cfg.leave.dest});
     custom.addEventListener('input',function(){if(custom.value.trim()){cfg.leave.dest=custom.value.trim();sv();}});
-    cc.appendChild(sField('Running to','Also used on the clock and in "Shoes on and into the car!". Or type any emoji.',[sSeg(DESTS.map(function(x){return [x[0],x[0]+' '+x[1]];}),cfg.leave.dest,function(v){cfg.leave.dest=v;custom.value='';sv();}),custom]));
+    cc.appendChild(sField('Running to','Or type any emoji.',[sSeg(DESTS.map(function(x){return [x[0],x[0]+' '+x[1]];}),cfg.leave.dest,function(v){cfg.leave.dest=v;custom.value='';sv();}),custom]));
     inner.appendChild(cc);
     var evl=(cfg.events||[]).filter(function(ev){return ev.leave;});
-    var ec=sCard('Leaving for activities','Sport, lessons and parties can have their own leave time. Set it on the event in Events → "We need to leave at". On those days the runner counts down to each one in turn.');
+    var ec=sCard('Leaving for activities','Set a leave time on any event in Events.');
     if(evl.length)evl.forEach(function(ev){ec.appendChild(sField((ev.emoji||'🚗')+' '+(ev.name||'Event'),repeatSummary(ev),[el('span',{'class':'muted'},'Leave '+fmtTime(ev.leave))]));});
     else ec.appendChild(el('p',{'class':'muted'},'None yet.'));
     ec.appendChild(el('div',{'class':'row',style:'margin-top:8px'},null)).appendChild(sBtn('Go to Events','',function(){sTab='events';renderSettings();sBody.scrollTop=0;}));
-    ec.appendChild(sField('Heads-up before leaving','Shows a banner and says "Nippers soon! We have to leave in 30 minutes" once, if the board is on. Off by default.',
+    ec.appendChild(sField('Heads-up before leaving','A spoken reminder before an activity.',
       [sSeg([['0','Off'],['15','15 min'],['30','30 min'],['45','45 min']],String(+cfg.leave.heads||0),function(v){cfg.leave.heads=+v;sv();})]));
     inner.appendChild(ec);
-    var kc=sCard('Talking clock','Pops up when a child taps the countdown or the time at the top.');
+    var kc=sCard('Talking clock','Opens when a child taps the countdown.');
     kc.appendChild(sField('Say the time out loud','"It\'s twenty past seven. We have to leave at quarter past eight…"',[sSwitch(cfg.leave.speak!==false,function(v){cfg.leave.speak=v;sv();})]));
-    kc.appendChild(sField('Show the time left','A coloured slice on the clock that shrinks as leaving gets closer (in the last hour).',[sSwitch(cfg.leave.showWedge!==false,function(v){cfg.leave.showWedge=v;sv();})]));
+    kc.appendChild(sField('Show the time left','',[sSwitch(cfg.leave.showWedge!==false,function(v){cfg.leave.showWedge=v;sv();})]));
     kc.appendChild(sField('Time-left colour','',[swatches([['#ff6b6b','Red'],['#ff9f43','Orange'],['#2ecc71','Green'],['#5aa9ff','Blue'],['#b98cff','Purple']],cfg.leave.wedge||'#ff6b6b',function(v){cfg.leave.wedge=v;sv();})]));
     kc.appendChild(sField('Clock face colour','',[swatches([['#ffffff','White'],['#fff4c2','Yellow'],['#d8ecff','Sky blue'],['#ffe0ef','Pink'],['#dff7e5','Mint']],cfg.leave.face||'#ffffff',function(v){cfg.leave.face=v;sv();})]));
-    kc.appendChild(sField('Show the digital time too','Handy for older kids learning to match the two.',[sSwitch(cfg.leave.digital!==false,function(v){cfg.leave.digital=v;sv();})]));
-    kc.appendChild(sField('Hand speed','How fast the hands travel round to the leaving time.',[sSeg([['slow','Slow'],['medium','Medium'],['fast','Fast']],cfg.leave.sweep||'slow',function(v){cfg.leave.sweep=v;sv();})]));
+    kc.appendChild(sField('Show the digital time too','',[sSwitch(cfg.leave.digital!==false,function(v){cfg.leave.digital=v;sv();})]));
+    kc.appendChild(sField('Hand speed','',[sSeg([['slow','Slow'],['medium','Medium'],['fast','Fast']],cfg.leave.sweep||'slow',function(v){cfg.leave.sweep=v;sv();})]));
     kc.appendChild(sField('Stays on screen for','',[sSeg([['5','5 sec'],['9','10 sec'],['20','20 sec']],String(cfg.leave.secs||9),function(v){cfg.leave.secs=+v;sv();})]));
     kc.appendChild(sField('Try it','',[sBtn('Show the clock','primary',function(){showClock();})]));
     inner.appendChild(kc);
@@ -2755,7 +2747,7 @@
 
   // ---------- Events ----------
   function setEvents(inner){
-    sHead(inner,'Events','Countdowns in "sleeps" on the home screen. Tap one on the board to hear it.');
+    sHead(inner,'Events');
     var kb=sCard('🎂 Your children\'s birthdays');
     cfg.kids.forEach(function(kd){
       var txt='Not set';
@@ -2765,7 +2757,7 @@
     });
     kb.appendChild(el('div',{'class':'row'},null)).appendChild(sBtn('Set birthdays in Children','',function(){sTab='children';renderSettings();sBody.scrollTop=0;}));
     inner.appendChild(kb);
-    var ec=sCard('Your events','Birthdays, sport and activities, parties, playdates, holidays. Tap one to edit.');
+    var ec=sCard('Your events','');
     var t0=today0();
     cfg.events.forEach(function(ev,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
@@ -2792,13 +2784,13 @@
         });
         whoBox.appendChild(c);
       });
-      b.appendChild(sField('Who\'s it for','Tap to include or leave out each child.',[whoBox]));
+      b.appendChild(sField('Who\'s it for','',[whoBox]));
       // when
       var dt=el('input',{type:'date',value:ev.date||'',required:'required'});dt.addEventListener('change',function(){ev.date=dt.value;evQuestCache.day='';redraw();});
       var tm=el('input',{type:'time',value:ev.time||''});tm.addEventListener('change',function(){ev.time=tm.value;sv();});
       var clr=ev.time?sBtn('No time','',function(){ev.time='';redraw();}):null;
-      b.appendChild(sField(r==='birthday'?'Date of birth':(r==='none'?'Date':'Starts on'),r==='birthday'?'Include the real year so the board knows how old they\'ll be.':'',[dt]));
-      if(r!=='birthday')b.appendChild(sField('Time (optional)','Shown and spoken on the day, e.g. "today at half past four".',[tm,clr]));
+      b.appendChild(sField(r==='birthday'?'Date of birth':(r==='none'?'Date':'Starts on'),r==='birthday'?'Include the year to show their age.':'',[dt]));
+      if(r!=='birthday')b.appendChild(sField('Time (optional)','',[tm,clr]));
       // repeats
       b.appendChild(sField('Repeats','',[sSeg([['none','Once'],['daily','Daily'],['weekly','Weekly'],['monthly','Monthly'],['yearly','Yearly'],['birthday','Birthday']],r,function(v){
         ev.repeat=v;if(v==='birthday'&&!ev.emoji)ev.emoji='🎂';
@@ -2828,10 +2820,10 @@
         if(ev.endMode==='after'){endc.push(sNum(ev.count||10,1,function(v){ev.count=v;evQuestCache.day='';redraw();},80));endc.push(el('span',{'class':'muted'},'times'));}
         b.appendChild(sField('Ends','e.g. the last training of the season.',endc));
       }
-      if(r==='none'&&ev.end&&ev.end>ev.date)b.appendChild(sField('Holiday mode','On each day of this event: the weekend quests are used and there\'s no leave time. Handy for trips and school holidays.',[sSwitch(evHoliday(ev),function(v){ev.holiday=v;evQuestCache.day='';sv();render();})]));
+      if(r==='none'&&ev.end&&ev.end>ev.date)b.appendChild(sField('Holiday mode','Weekend quests and no leave time.',[sSwitch(evHoliday(ev),function(v){ev.holiday=v;evQuestCache.day='';sv();render();})]));
       if(r==='none'){
         var en=el('input',{type:'date',value:ev.end||''});en.addEventListener('change',function(){ev.end=en.value;redraw();});
-        b.appendChild(sField('Last day (optional)','For things that last a while, like holidays. Shows "On now!" during it.',[en]));
+        b.appendChild(sField('Last day (optional)','',[en]));
       }
       b.appendChild(el('p',{'class':'status'},'📅 '+repeatSummary(ev)+(next?' · next: '+(daysBetween(t0,next)===0?'today':daysBetween(t0,next)===1?'tomorrow':fmtDate(ymd(next))):(ev.date?' · no more dates':''))));
       // on the board
@@ -2841,16 +2833,16 @@
       var qs=el('select');qs.appendChild(el('option',{value:''},'Nothing extra'));
       cfg.steps.forEach(function(st){var o=el('option',{value:st.id},(/^svg:/.test(st.emoji)?'':st.emoji+' ')+st.label+(stepPeriod(st)==='pm'?' (afternoon)':''));if(ev.quest===st.id)o.selected=true;qs.appendChild(o);});
       qs.addEventListener('change',function(){ev.quest=qs.value;evQuestCache.day='';sv();});
-      b.appendChild(sField('Add a quest on the day','e.g. "Swim bag" on swimming days. Shows for the children above, even if it\'s switched off in the week plan.',[qs]));
+      b.appendChild(sField('Add a quest on the day','',[qs]));
       var lv=el('input',{type:'time',value:ev.leave||''});
       lv.addEventListener('change',function(){ev.leave=lv.value||'';sv();render();redrawCal();});
       var lvClear=sBtn('No leaving','',function(){ev.leave='';lv.value='';sv();render();redrawCal();});
-      b.appendChild(sField('We need to leave at','The runner counts down to this on the day, using this event\'s picture as the destination. Great for sport and lessons after school.',[lv,lvClear]));
+      b.appendChild(sField('We need to leave at','The runner counts down to this instead.',[lv,lvClear]));
       var calBox=el('div');
       function redrawCal(){calBox.innerHTML='';if(!ev.leave)return;
-        calBox.appendChild(sField('Reminder on the tablet','Adds "Leave for '+(ev.name||'this')+'" to Google Calendar (with the repeats). The calendar\'s reminder pops up even when another app is open.',[sBtn('📅 Add to Google Calendar','',function(){window.open(gcalLink(ev),'_blank','noopener');})]));}
+        calBox.appendChild(sField('Reminder on the tablet','Pops up even when another app is open.',[sBtn('📅 Add to Google Calendar','',function(){window.open(gcalLink(ev),'_blank','noopener');})]));}
       redrawCal();b.appendChild(calBox);
-      b.appendChild(sField('Make the board special on the day','Party colours, decorations and a big banner. Best for birthdays and one-off days, not weekly things.',[sSwitch(evSpecial(ev),function(v){ev.special=v;sv();})]));
+      b.appendChild(sField('Make the board special on the day','Party colours and a banner.',[sSwitch(evSpecial(ev),function(v){ev.special=v;sv();})]));
       var lcBox=el('div',{style:'flex:1;min-width:240px'});
       (function drawLoc(){
         lcBox.innerHTML='';
@@ -2860,7 +2852,7 @@
         lcBox.appendChild(cur);
         lcBox.appendChild(placeSearch('Away somewhere? Type the town',function(pl){ev.loc=pl;sv();wxLocChanged();drawLoc();}));
       })();
-      b.appendChild(sField('Weather location','Going away? Set where, and "What should I wear?" uses that place\'s weather '+(r==='none'?'from the first to the last day':'on each of these days')+', then switches back home.',[lcBox]));
+      b.appendChild(sField('Weather location','Uses that town\'s weather '+(r==='none'?'for these days':'on these days')+'.',[lcBox]));
       var acts=el('div',{'class':'row',style:'justify-content:flex-end;margin-top:6px'});
       acts.appendChild(sConfirm('Delete event','Tap again to delete','linkbtn',function(){cfg.events.splice(idx,1);evQuestCache.day='';sv();renderSettings();}));
       b.appendChild(acts);d.appendChild(b);ec.appendChild(d);
@@ -2875,19 +2867,19 @@
     });
     ec.appendChild(adds);inner.appendChild(ec);
 
-    var hc=sCard('Public holidays','Updated automatically each week, including local-only days (like Melbourne Cup in Victoria).');
+    var hc=sCard('Public holidays','');
     hc.appendChild(sField('Show public holidays','',[sSwitch(cfg.holidays.on,function(v){cfg.holidays.on=v;sv();fetchHolidays();})]));
     if(cfg.holidays.on){
       var cs=el('select');
       holCountries(function(list){cs.innerHTML='';list.forEach(function(c){var o=el('option',{value:c[0]},c[1]);if(c[0]===cfg.holidays.country)o.selected=true;cs.appendChild(o);});});
       cs.addEventListener('change',function(){cfg.holidays.country=cs.value;cfg.holidays.region='';sv();fetchHolidays();renderSettings();});
-      hc.appendChild(sField('Country','Changes automatically when you set a home town in another country.',[cs]));
+      hc.appendChild(sField('Country','',[cs]));
       var regs=holRegions[cfg.holidays.country]||[];
       if(regs.length){
         var rs=el('select');rs.appendChild(el('option',{value:''},'Whole country only'));
         regs.forEach(function(r){var o=el('option',{value:r.split('-')[1]},regionName(r));if(r.split('-')[1]===cfg.holidays.region)o.selected=true;rs.appendChild(o);});
         rs.addEventListener('change',function(){cfg.holidays.region=rs.value;sv();fetchHolidays();render();});
-        hc.appendChild(sField('State / region','Adds holidays that only happen where you live.',[rs]));
+        hc.appendChild(sField('State / region','',[rs]));
       }
       var y0=today0().getFullYear(),c0=holCache[holKey(y0)];
       if(c0&&c0.none)hc.appendChild(el('p',{'class':'status'},'⚠️ Public holidays aren\'t available for this country yet. Add the important ones yourself as events (Repeats: Yearly).'));
@@ -2895,32 +2887,32 @@
     hc.appendChild(sField('Start the countdown','Days before each holiday.',[sNum(cfg.holidays.lead,0,function(v){cfg.holidays.lead=v;sv();})]));
     inner.appendChild(hc);
 
-    var cc=sCard('Celebrations','Worked out automatically every year, using the dates for your holiday country (e.g. Father\'s Day is in September in Australia, June in the US and UK). Number = days of countdown.');
+    var cc=sCard('Celebrations','Number = days of countdown.');
     SPECIALS.forEach(function(x){
       var sp=cfg.specials[x[0]]||(cfg.specials[x[0]]={on:true,lead:x[3]});
       cc.appendChild(sField(x[1]+' '+x[2],'',[sNum(sp.lead,0,function(v){sp.lead=v;sv();},80),sSwitch(sp.on,function(v){sp.on=v;sv();})]));
     });
     inner.appendChild(cc);
-    var pc=sCard('Preview a special day','On the day of an event, the whole board changes to match it. Pick one to see it for 30 seconds.');
+    var pc=sCard('Preview a special day','Tap one to preview it.');
     pc.appendChild(sSeg([['birthday','🎂 Birthday'],['christmas','🎄 Christmas'],['easter','🐣 Easter'],['halloween','🎃 Halloween'],['newyear','🎆 New Year'],['holiday','🏖️ Holiday'],['party','🎈 Party']],'',function(v){
       previewTheme=v;themeKeyShown='';sv();document.getElementById('settings').classList.remove('open');render();renderWx();
       setTimeout(function(){previewTheme=null;themeKeyShown='';render();},30000);
     }));
     inner.appendChild(pc);
     var dc=sCard();
-    dc.appendChild(sField('Default countdown for your events','How many days before an event its countdown appears, unless the event says otherwise.',[sNum(cfg.eventLead,0,function(v){cfg.eventLead=v;sv();})]));
+    dc.appendChild(sField('Default countdown for your events','',[sNum(cfg.eventLead,0,function(v){cfg.eventLead=v;sv();})]));
     inner.appendChild(dc);
   }
 
   // ---------- Rewards ----------
   var openReward=null;
   function setRewards(inner){
-    sHead(inner,'Rewards','Set up rules like "If Ava brushes her teeth 10 times, she gets a sticker." The board counts it for you and celebrates when it\'s earned.');
+    sHead(inner,'Rewards');
     var kidOf=function(id){return cfg.kids.filter(function(x){return x.id===id;})[0];};
     // anything waiting to be handed over goes first
     var waiting=rwWaiting();
     if(waiting.length){
-      var wc=sCard('🎁 Ready to hand over','Tap "Given" once they have it. Money goes into their money jar.');
+      var wc=sCard('🎁 Ready to hand over','');
       waiting.forEach(function(x){
         var row=el('div',{'class':'rwwait'});row.appendChild(el('span',{'class':'rwwe'},x.rw.emoji||'🎁'));
         var t=el('div',{'class':'rwwt'});t.appendChild(el('b',null,x.kd.emoji+' '+x.kd.name+' earned '+rwPrize(x.rw)));t.appendChild(el('span',null,rwSummary(x.rw)));row.appendChild(t);
@@ -2929,7 +2921,7 @@
       });
       inner.appendChild(wc);
     }
-    var lc=sCard('Your rewards','Tap a reward to edit it. Rewards count from the day you create them.');
+    var lc=sCard('Your rewards','Counts start from the day a reward is made.');
     cfg.rewards.forEach(function(rw,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},rw.kind==='money'?'💰':(rw.emoji||'🎁')));sm.appendChild(el('span',{'class':'iname'},rwPrize(rw)||'New reward'));
@@ -2943,7 +2935,7 @@
       if(rw.kind==='money'){
         var amt=el('input',{type:'number',min:'0',step:'0.5',value:String(rw.amount||1),style:'width:110px','class':'numin'});
         amt.addEventListener('change',function(){var v=parseFloat(amt.value);if(!isNaN(v)&&v>=0){rw.amount=Math.round(v*100)/100;redraw();render();}});
-        b.appendChild(sField('How much','Added to their money jar when you tap "Given".',[el('span',{'class':'muted'},curCode()),amt]));
+        b.appendChild(sField('How much','',[el('span',{'class':'muted'},curCode()),amt]));
       } else {
         var em=emojiBtn(rw.emoji||'🎁',function(v){rw.emoji=v;sv();render();},'reward',function(){return rw.prize||'';});
         var pz=el('input',{type:'text',value:rw.prize||'',placeholder:'e.g. Choose what\'s for dinner',style:'flex:1;min-width:180px'});pz.addEventListener('input',function(){rw.prize=pz.value;sv();});
@@ -2970,10 +2962,10 @@
         b.appendChild(sField('Which quest',null,[qs]));
       }
       b.appendChild(sField(rw.frame==='row'?'How many days':'How many times',null,[sNum(+rw.n||5,1,function(v){rw.n=v;redraw();},80)]));
-      b.appendChild(sField('Counting',{since:'Adds up over time. Starts again after you mark it as given.',week:'Has to happen within one week (Monday to Sunday). Starts fresh each Monday.',row:'Days in a row. Missing a day starts it again.'}[rw.frame||'since'],
+      b.appendChild(sField('Counting',{since:'Resets when given.',week:'Resets each Monday.',row:'A missed day resets it.'}[rw.frame||'since'],
         [sSeg([['since','Over time'],['week','In one week'],['row','In a row']],rw.frame||'since',function(v){rw.frame=v;redraw();})]));
       b.appendChild(sField('Repeats',null,[sSeg([['every','Every time'],['once','Just once']],rw.repeat||'every',function(v){rw.repeat=v;redraw();})]));
-      b.appendChild(sField('Show progress on their card','e.g. "🎁 3/5". Seeing it grow keeps kids keen.',[sSwitch(rw.show!==false,function(v){rw.show=v;sv();})]));
+      b.appendChild(sField('Show progress on their card','Shows 🎁 3/5 on their card.',[sSwitch(rw.show!==false,function(v){rw.show=v;sv();})]));
       rwKids(rw).forEach(function(id){
         var kd=kidOf(id);if(!kd)return;var pr=rwProgress(rw,id);
         var bar=el('div',{'class':'pbar'});var fill=el('div',{'class':'pfill'});fill.style.width=Math.round(pr.count/pr.n*100)+'%';bar.appendChild(fill);
@@ -2987,7 +2979,7 @@
       acts.appendChild(sConfirm('Delete reward','Tap again to delete','linkbtn',function(){cfg.rewards.splice(idx,1);sv();renderSettings();render();}));
       b.appendChild(acts);d.appendChild(b);lc.appendChild(d);
     });
-    if(!cfg.rewards.length)lc.appendChild(el('p',{'class':'muted'},'No rewards yet. Start from an idea below, or make your own.'));
+    if(!cfg.rewards.length)lc.appendChild(el('p',{'class':'muted'},'No rewards yet.'));
     var adds=el('div',{'class':'row',style:'margin-top:10px'});
     adds.appendChild(sBtn('+ New reward','primary',function(){var r={id:'r'+Date.now(),emoji:'🎁',prize:'',kids:[],type:'quest',quest:'teeth',n:10,frame:'since',repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();}));
     lc.appendChild(adds);
@@ -3003,7 +2995,7 @@
     lc.appendChild(ideas);
     inner.appendChild(lc);
     // money jars
-    var mc=sCard('💰 Money jars','Money rewards add up here. When they spend some (an ice block at school, a toy), take it out so the jar stays right. No real money goes through the app.');
+    var mc=sCard('💰 Money jars','Take money out when they spend some.');
     cfg.kids.forEach(function(kd){
       var mj=kidMoney(kd);
       var row=el('div',{'class':'mjrow'});
@@ -3023,14 +3015,14 @@
     });
     inner.appendChild(mc);
     // trophy case
-    var tc=sCard('🏆 Trophy case','Badges the board gives out by itself: Bronze → Silver → Gold → Diamond → Legend, a new challenge every month, and secret badges to discover. Kids tap 🏆 on their card to see them.');
+    var tc=sCard('🏆 Trophy case','Kids tap 🏆 on their card to see them.');
     tc.appendChild(sField('Show the trophy case','',[sSwitch(trophOn(),function(v){cfg.trophies=v;sv();render();renderSettings();})]));
     if(trophOn()){
-      tc.appendChild(sField('Monthly challenge','Days with every quest finished needed to win the month\'s badge.',[sNum(monthGoal(),1,function(v){cfg.monthGoal=Math.min(31,v);sv();render();}),el('span',{'class':'muted'},'days')]));
+      tc.appendChild(sField('Monthly challenge','Full days needed for the monthly badge.',[sNum(monthGoal(),1,function(v){cfg.monthGoal=Math.min(31,v);sv();render();}),el('span',{'class':'muted'},'days')]));
       var ob=el('div',{'class':'row'});
       cfg.kids.forEach(function(kd,k){ob.appendChild(sBtn(kd.emoji+' '+kd.name+'\'s trophies ('+trophCount(k)+')','',function(){document.getElementById('closeSettings').click();openTrophies(k,true);}));});
       tc.appendChild(sField('Have a look','',[ob]));
-      tc.appendChild(sField('Reset trophies','Takes every badge away. They\'ll be won again from the history.',[sConfirm('Reset','Tap again to reset','btn danger',function(){troph={};save('qb_troph',troph);render();renderSettings();})]));
+      tc.appendChild(sField('Reset trophies','',[sConfirm('Reset','Tap again to reset','btn danger',function(){troph={};save('qb_troph',troph);render();renderSettings();})]));
     }
     inner.appendChild(tc);
   }
@@ -3060,18 +3052,17 @@
       var n=el('div',{'class':'loadnote'});n.appendChild(el('span',{'class':'loadi'},'💡'));
       var t=el('div',{style:'flex:1;min-width:0'});
       t.appendChild(el('b',null,kd.name+' finished their '+per[1]+' on '+fin+' of the last '+seen+' days'));
-      t.appendChild(el('p',null,(avg>lim?'With about '+avg+' quests, the '+per[1]+' routine might be too long. Try dropping one they now do without thinking, or moving one to another part of the day.':'The '+per[1]+' routine has about '+avg+' quests. If one keeps getting skipped (see "Quest by quest" below), try a smaller step or a different picture.')+(kd.mode!=='nownext'?' One-at-a-time mode can also help.':'')));
+      t.appendChild(el('p',null,(avg>lim?'About '+avg+' quests might be too long. Try dropping one they now do without thinking.':'About '+avg+' quests. Check Quest by quest below for the one that gets skipped.')+(kd.mode!=='nownext'?' One-at-a-time mode can also help.':'')));
       n.appendChild(t);out.push(n);
     });
     return out;
   }
   function setProgress(inner){
-    sHead(inner,'Progress','How each child is going over time. Tap a square for that day\'s details.');
+    sHead(inner,'Progress');
     inner.appendChild(sSeg([['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days']],String(sRange),function(v){sRange=+v;renderSettings();}));
     inner.appendChild(el('div',{style:'height:12px'}));
     proofCard(inner);
     var keys=Object.keys(hist).sort();
-    if(keys.length<3)inner.appendChild(el('p',{'class':'status',style:'margin-bottom:14px'},'📈 Tracking started '+(keys[0]?fmtDate(keys[0]):'today')+'. The dashboard fills in as the days go by.'));
     var t=today0(),from=addDays(t,-(sRange-1));
     cfg.kids.forEach(function(kd,k){
       var c=sCard();kidColour(c,k);
@@ -3119,7 +3110,7 @@
       lg.appendChild(el('span',null,'All done ⭐'));var nn=el('span',{'class':'hsw none'});lg.appendChild(nn);lg.appendChild(el('span',null,'No quests'));
       c.appendChild(lg);
       // morning vs afternoon
-      if(amT||pmT)c.appendChild(sField('Morning vs afternoon','Share of quests done in each part of the day.',[
+      if(amT||pmT)c.appendChild(sField('Morning vs afternoon','',[
         el('span',{'class':'pill'},'🌅 '+(amT?Math.round(amD/amT*100)+'%':'–')),el('span',{'class':'pill'},'☀️ '+(pmT?Math.round(pmD/pmT*100)+'%':'–'))]));
       // quest by quest, least done first
       var rows=Object.keys(per).map(function(id){return [id,per[id][0],per[id][1]];}).filter(function(x){return stepByIdRaw(x[0]);});
@@ -3181,7 +3172,7 @@
     sv();wx=null;fetchWx();
   }
   function setWeather(inner){
-    sHead(inner,'Weather','Powers "What should I wear?" and the automatic sunscreen reminder.');
+    sHead(inner,'Weather');
     var lc=sCard('Location');
     var curName=el('b',null,cfg.loc.name||'Frankston');
     var cur=el('div',{'class':'row'});cur.appendChild(el('span',{'class':'muted'},'Currently:'));cur.appendChild(curName);lc.appendChild(cur);
@@ -3191,37 +3182,37 @@
     uc.appendChild(sField('Show temperatures in','',[sSeg([['C','°C'],['F','°F']],useF()?'F':'C',function(v){cfg.units=v;sv();renderWx();renderSettings();})]));
     inner.appendChild(uc);
     var sc=sCard('Sunscreen');
-    sc.appendChild(sField('Add the sunscreen quest automatically','Appears when the sun will be strong in the next 8 hours, and disappears on low-UV days (most of winter).',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
-    var UVX={2:'Extra careful: even on low-UV days. For very fair skin, or kids who burn easily.',
-      3:'Recommended. Sunscreen from "moderate" UV upwards: the level the WHO and SunSmart use.',
-      4:'Skips the mildest moderate days. Fine for kids who rarely burn.',
-      5:'Only stronger days. Kids with fair skin can still burn at UV 3 to 4.',
-      6:'Only "high" UV days and above. Not advised for kids: UV 3 to 5 can still burn.'};
+    sc.appendChild(sField('Add the sunscreen quest automatically','Only on days the UV gets high enough.',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
+    var UVX={2:'Very cautious.',
+      3:'Recommended. The SunSmart level.',
+      4:'Skips the mildest days.',
+      5:'Kids can still burn at UV 3–4.',
+      6:'Not advised. Kids can burn at UV 3–5.'};
     var uvx=el('p',{'class':'hint',style:'margin:4px 0 0'},UVX[uvLimit()]||'');
-    sc.appendChild(sField('UV level that needs sunscreen','The UV index runs from 1 (low) to 11+ (extreme).',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();uvx.textContent=UVX[+v];renderWx();})]));
+    sc.appendChild(sField('UV level that needs sunscreen','',[sSeg([['2','2'],['3','3'],['4','4'],['5','5'],['6','6']],String(uvLimit()),function(v){cfg.uvLimit=+v;sv();uvx.textContent=UVX[+v];renderWx();})]));
     sc.appendChild(uvx);
     inner.appendChild(sc);
-    var cl=sCard('Clothes colours','The card turns one colour for the day, based on the top temperature.');
+    var cl=sCard('Clothes colours','');
     var lg=el('div',{'class':'legend'});
     [['#ff5e5e',tmp(27)+'+','Hot'],['#ff9f43',tmp(22).replace('°','')+'–'+tmp(26),'Warm'],['#f6d743',tmp(17).replace('°','')+'–'+tmp(21),'Nice'],['#4fa3ff',tmp(12).replace('°','')+'–'+tmp(16),'Cool'],['#a77bff','under '+tmp(12),'Cold']].forEach(function(x){
       var i=el('div',{'class':'lgi'});var dot=el('span',{'class':'lgd'});dot.style.background=x[0];i.appendChild(dot);i.appendChild(el('span',null,x[2]+' · '+x[1]));lg.appendChild(i);
     });
-    cl.appendChild(lg);cl.appendChild(el('p',{'class':'hint'},'Shorts or dresses for each child is set in Children.'));
+    cl.appendChild(lg);
     inner.appendChild(cl);
   }
 
   // ---------- Sound ----------
   function setSound(inner){
-    sHead(inner,'Sound','How the board talks to the kids.');
+    sHead(inner,'Sound');
     var mc=sCard();
-    mc.appendChild(sField('Voice','Reads out each quest, the weather and countdowns.',[sSwitch(cfg.voice,function(v){cfg.voice=v;sv();})]));
+    mc.appendChild(sField('Voice','',[sSwitch(cfg.voice,function(v){cfg.voice=v;sv();})]));
     mc.appendChild(sField('Try it','',[sBtn('▶ Play a sample','primary',function(){var v=cfg.voice;cfg.voice=true;say('You brushed your teeth, superstar!');cfg.voice=v;})]));
     inner.appendChild(mc);
-    var ac=sCard('✨ Natural voice','A free AI voice made on this device, so nothing is sent anywhere. The first time it downloads about 100 MB (use Wi-Fi), then works offline.');
+    var ac=sCard('✨ Natural voice','About 100 MB to download once (use wifi).');
     ac.appendChild(sField('Use the natural voice','If it can\'t load, the '+devWord()+'\'s own voice is used instead.',[sSwitch(cfg.ai.on,function(v){cfg.ai.on=v;sv();AI.failedAt=0;if(AI.state==='error')AI.state='off';if(v)aiLoad();aiStatus();})]));
     var avs=el('select');AI_VOICES.forEach(function(v){var o=el('option',{value:v[0]},v[1]);if(v[0]===cfg.ai.voice)o.selected=true;avs.appendChild(o);});
     avs.addEventListener('change',function(){cfg.ai.voice=avs.value;sv();AI.state='off';AI.failedAt=0;if(cfg.ai.on)aiLoad();aiStatus();});
-    ac.appendChild(sField('Which voice','Each new voice is another download.',[avs]));
+    ac.appendChild(sField('Which voice','',[avs]));
     ac.appendChild(el('p',{'class':'status',id:'aiStatus'},''));
     setTimeout(aiStatus,0);
     inner.appendChild(ac);
@@ -3244,7 +3235,7 @@
       s.addEventListener('input',function(){cfg[key]=parseFloat(s.value);val.textContent=s.value;sv();});return [s,val];
     }
     var sp=slider('rate',0.6,1.4,0.05,0.95),pi=slider('pitch',0.5,2,0.05,1.25);
-    b.appendChild(sField('Speed','Also affects the natural voice.',sp));
+    b.appendChild(sField('Speed','',sp));
     b.appendChild(sField('Pitch','Built-in voice only.',pi));
     b.appendChild(el('p',{'class':'hint'},'Better built-in voices on Android: Settings → search "Text-to-speech" → Preferred engine: Speech Services by Google → install voice data → English (Australia).'));
     d.appendChild(b);tc.appendChild(d);inner.appendChild(tc);
@@ -3423,13 +3414,12 @@
   }
   var openMsg=null;
   function setMessages(inner){
-    sHead(inner,'Voice messages','Record a message, e.g. from Nana or Pop, and it plays when the moment comes: when they finish, on a special day, or as a surprise.');
+    sHead(inner,'Voice messages');
     var nc=sCard();nc.classList.add('reccard');
     nc.appendChild(sBtn('🎙️ Record a new message','primary big',function(){newMessageFlow(null);}));
-    nc.appendChild(el('p',{'class':'hint',style:'margin-top:8px'},'Recordings stay on this '+devWord()+' only. They play out loud when Medo is open on the home screen.'));
     inner.appendChild(nc);
     var lc=sCard('Messages');
-    if(!cfg.messages.length)lc.appendChild(el('p',{'class':'muted'},'No messages yet. Grandparents visiting? Hand them the '+devWord()+' and tap the red button.'));
+    if(!cfg.messages.length)lc.appendChild(el('p',{'class':'muted'},'No messages yet.'));
     cfg.messages.forEach(function(m,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
@@ -3451,8 +3441,8 @@
       MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
         bt.addEventListener('click',function(){m.when=w[0];if(w[0]==='date'&&!m.date)m.date=today();if(w[0]==='time'&&!m.time)m.time='07:30';redraw();});tg.appendChild(bt);});
       var tf=el('div',{'class':'field col'});tf.appendChild(el('div',{'class':'fl'})).appendChild(el('b',null,'When it plays'));tf.appendChild(tg);b.appendChild(tf);
-      if(m.when==='date'){var di=el('input',{type:'date',value:m.date||'',required:'required'});di.addEventListener('change',function(){m.date=di.value;redraw();});b.appendChild(sField('Date','e.g. a birthday or the first day of school.',[di]));}
-      if(m.when==='time'){var ti=el('input',{type:'time',value:m.time||'07:30',required:'required'});ti.addEventListener('change',function(){m.time=ti.value;redraw();});b.appendChild(sField('Time','Plays if the board is on, or the next time it\'s used that morning.',[ti]));}
+      if(m.when==='date'){var di=el('input',{type:'date',value:m.date||'',required:'required'});di.addEventListener('change',function(){m.date=di.value;redraw();});b.appendChild(sField('Date','',[di]));}
+      if(m.when==='time'){var ti=el('input',{type:'time',value:m.time||'07:30',required:'required'});ti.addEventListener('change',function(){m.time=ti.value;redraw();});b.appendChild(sField('Time','',[ti]));}
       if(m.when!=='date')b.appendChild(sField('Plays',null,[sSeg([['once','Just once'],['every','Every time']],m.repeat||'once',function(v){m.repeat=v;redraw();})]));
       var heard=msgKids(m).map(function(id){var kd=cfg.kids.filter(function(x){return x.id===id;})[0];var n=((m.played||{})[id]||[]).length;return kd?kd.emoji+' '+kd.name+': '+(n?'heard '+n+'×':'not yet'):'';}).filter(Boolean).join(' · ');
       b.appendChild(el('p',{'class':'status'},heard));
@@ -3472,7 +3462,7 @@
     entries:{type:'entry.2053761877',message:'entry.178877530',email:'entry.903745266',info:'entry.2019410301'},email:''};
   function fbInfo(){return ['Medo '+BOARD_VERSION,devWord(),(navigator.userAgent.match(/(Android [\d.]+|iPhone OS [\d_]+|iPad|Windows NT [\d.]+|Mac OS X [\d_]+)/)||[''])[0],nKids()+' kids',cfg.holidays&&cfg.holidays.country||''].filter(Boolean).join(' · ');}
   function setAbout(inner){
-    sHead(inner,'About Medo','');
+    sHead(inner,'About Medo');
     var st=sCard();st.classList.add('storycard');
     var lg=document.getElementById('brand').querySelector('svg').cloneNode(true);lg.setAttribute('class','storylogo');st.appendChild(lg);
     [['It started with two little words.'],
@@ -3497,7 +3487,7 @@
     });
     inner.appendChild(wh);
     // feedback
-    var fc=sCard('💬 Send feedback','Ideas, bugs, or something your kids loved. It goes straight to the person who makes Medo.');
+    var fc=sCard('💬 Send feedback','Ideas, bugs, or something your kids loved.');
     var ftype='idea';
     fc.appendChild(sField('What kind?','',[sSeg([['idea','💡 An idea'],['bug','🐞 Something\'s wrong'],['love','💛 We love it']],ftype,function(v){ftype=v;})]));
     var msg=el('textarea',{rows:'4','class':'fbtext',placeholder:'Tell us here…',maxlength:'2000'});fc.appendChild(msg);
@@ -3526,7 +3516,7 @@
     var row=el('div',{'class':'row',style:'margin-top:8px'});row.appendChild(send);fc.appendChild(row);fc.appendChild(status);
     inner.appendChild(fc);
     // credits
-    var cr=sCard('🙏 Thanks to','Medo is built on free, open services.');
+    var cr=sCard('🙏 Thanks to','');
     [['Weather','Open-Meteo.com (CC BY 4.0)','https://open-meteo.com/'],['Public holidays','Nager.Date','https://date.nager.at/'],['Natural voices','Piper, by the Rhasspy and Open Home projects','https://github.com/rhasspy/piper'],['Lettering','Chewy font (Google Fonts, SIL Open Font License)','https://fonts.google.com/specimen/Chewy']].forEach(function(x){
       var a=el('a',{href:x[2],target:'_blank',rel:'noopener','class':'credit'},x[1]);cr.appendChild(sField(x[0],'',[a]));
     });
@@ -3536,7 +3526,7 @@
 
   // ---------- This device ----------
   function setDevice(inner){
-    sHead(inner,'This device','Everything here is saved on this device only. Other families using the link keep their own.');
+    sHead(inner,'This device');
     var ic=sCard('📲 Install as an app');
     if(isInstalled())ic.appendChild(el('p',{'class':'status'},'✅ Installed. It opens full screen from its own icon and works without internet.'));
     else{
@@ -3547,7 +3537,7 @@
     var lc=sCard();
     lc.appendChild(sField('Home screen layout','',[sSeg([['hybrid','Card per child'],['split','All children side by side']],cfg.layout||'hybrid',function(v){cfg.layout=v;view=-1;sv();})]));
     inner.appendChild(lc);
-    var bk=sCard('💾 Backup','Keep a copy of children, quests, reading days, stars, history and trophies. Use it to move to a new device, or give another family your setup.');
+    var bk=sCard('💾 Backup','Move to a new device or share your setup.');
     var sa=0;try{sa=+localStorage.getItem('qb_saved_at')||0;}catch(e){}
     bk.appendChild(el('p',{'class':'muted'},'Last saved: '+(sa?new Date(sa).toLocaleString():'not yet')));
     var ta=el('textarea',{rows:'3','class':'codebox',placeholder:'Tap "Make backup code", or paste a code here to restore'});
@@ -3565,18 +3555,18 @@
     });
     brow.appendChild(mk);brow.appendChild(rs);bk.appendChild(brow);inner.appendChild(bk);
     var stc=sCard('📊 Anonymous usage stats');
-    stc.appendChild(sField('Help improve Medo','Shares simple counts, like how many boards are used each day, the app version, phone or tablet, and which features get used. Never names, photos, quests or anything personal. Saved for this device.',[sSwitch(statsOn(),function(v){try{localStorage.setItem('qb_stats',v?'on':'off');}catch(e){}if(v)statsStart();})]));
+    stc.appendChild(sField('Help improve Medo','Simple counts like daily use and which features get used. Never names, photos or quests.',[sSwitch(statsOn(),function(v){try{localStorage.setItem('qb_stats',v?'on':'off');}catch(e){}if(v)statsStart();})]));
     inner.appendChild(stc);
     var hc=sCard('🧭 Help');
-    hc.appendChild(sField('Show the tips again','Brings back the 💡 tips in settings and the pointing hand for the kids.',[sBtn('Show tips','',function(){tips={};save('qb_tips',tips);renderSettings();})]));
+    hc.appendChild(sField('Show the tips again','',[sBtn('Show tips','',function(){tips={};save('qb_tips',tips);renderSettings();})]));
     hc.appendChild(sField('Run the setup again','Children, town, leave time and voice. Nothing is deleted.',[sBtn('Run setup','',function(){document.getElementById('closeSettings').click();openSetup();})]));
     inner.appendChild(hc);
     var rc=sCard('Reset');
     rc.appendChild(sField('Clear today\'s ticks','Unticks everything for today. Stars and reading days stay.',[sConfirm('Clear','Tap again to clear','btn',function(){prog=null;ensureProg();renderSettings();})]));
-    rc.appendChild(sField('Clear progress history','Empties the Progress dashboard and restarts reward counts. Stars and reading days stay.',[sConfirm('Clear history','Tap again to clear','btn danger',function(){hist={};save('qb_hist',hist);recordToday();renderSettings();})]));
-    rc.appendChild(sField('Restore the default quests','Replaces your quests and week plan. Children, stars and reading days stay.',[sConfirm('Restore','Tap again to restore','btn danger',function(){var names=cfg.kids;cfg=defaults();cfg.kids=names;normalize();sv();renderSettings();})]));
+    rc.appendChild(sField('Clear progress history','Clears Progress and reward counts. Stars and reading stay.',[sConfirm('Clear history','Tap again to clear','btn danger',function(){hist={};save('qb_hist',hist);recordToday();renderSettings();})]));
+    rc.appendChild(sField('Restore the default quests','Replaces quests and the week plan. Children and stars stay.',[sConfirm('Restore','Tap again to restore','btn danger',function(){var names=cfg.kids;cfg=defaults();cfg.kids=names;normalize();sv();renderSettings();})]));
     inner.appendChild(rc);
-    var uc=sCard('Updates','The board checks for a new version every 10 minutes and refreshes itself when nobody has touched it for a minute or two.');
+    var uc=sCard('Updates','Updates install by themselves.');
     var ust=el('span',{'class':'muted'},updateReady?'New version ready: '+updateReady:'Version: '+BOARD_VERSION);
     var fr=sBtn('Force refresh','',function(){fr.textContent='Refreshing…';forceRefresh();});
     var ub=sBtn(updateReady?'Update now':'Check now','primary',function(){
@@ -3589,7 +3579,7 @@
       });
     });
     uc.appendChild(sField('This board',null,[ust,ub]));
-    uc.appendChild(sField('Stuck on an old version?','Clears the saved offline copy of the board and reloads it from the internet. Your children, quests, stars, history and trophies are not touched.',[fr]));
+    uc.appendChild(sField('Stuck on an old version?','Reloads the app. Your settings stay.',[fr]));
     inner.appendChild(uc);
     inner.appendChild(el('p',{'class':'ssub',style:'text-align:center'},'Medo · routines they own · version '+BOARD_VERSION));
   }
