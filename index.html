@@ -584,6 +584,9 @@
   .pkbtn{font-family:inherit;font-size:16px;font-weight:700;padding:9px 14px;border-radius:12px;border:2px solid #444b8a;background:#0e1130;color:#fff;cursor:pointer;white-space:nowrap}
   .pkbtn.empty{color:var(--muted);font-weight:600}.pkbtn:disabled{opacity:.45;cursor:default}
   .pksheet{max-width:560px}
+  .emoov.pkov{align-items:center;padding:16px}
+  .pkov .pksheet{border-radius:24px;max-height:calc(100vh - 32px);animation:pkPop .2s ease-out;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  @keyframes pkPop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
   .pkprev{font-size:clamp(30px,6vw,42px);font-weight:800;text-align:center;margin:4px 0 6px;color:#ffd96a}
   .pkgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .pkgrid button,.pkap button,.pkcal button{height:52px;border-radius:14px;border:none;background:#2f3670;color:#fff;font-family:inherit;font-size:20px;font-weight:800;cursor:pointer}
@@ -683,7 +686,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · messages after a quest';
+  var BOARD_VERSION='14 Nov 2026 · pickers in the middle';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2395,7 +2398,7 @@
   function pkTimeText(v){if(!v)return '';var p=v.split(':'),h=+p[0];return ((h%12)||12)+':'+p[1]+(h<12?' am':' pm');}
   function pkDateText(v){if(!v)return '';var d=parseD(v);return DAY_SHORT[d.getDay()]+' '+d.getDate()+' '+MON_SHORT[d.getMonth()]+' '+d.getFullYear();}
   function pkSheet(title){
-    var ov=el('div',{'class':'emoov'}),sh=el('div',{'class':'emosheet pksheet'});ov.appendChild(sh);
+    var ov=el('div',{'class':'emoov pkov'}),sh=el('div',{'class':'emosheet pksheet'});ov.appendChild(sh);
     var hd=el('div',{'class':'emohead'});hd.appendChild(el('b',null,title));
     var x=el('button',{'class':'tclose',title:'Close'},'✕');x.addEventListener('click',function(){ov.remove();});hd.appendChild(x);sh.appendChild(hd);
     var body=el('div',{'class':'emobody'});sh.appendChild(body);
