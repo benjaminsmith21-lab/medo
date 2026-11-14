@@ -226,7 +226,9 @@ test('voice message on a date plays by itself when the board is on',async()=>{
   const t=boot({idb:true,cfg:c=>{c.messages=[{id:'m2',from:{name:'Pop',emoji:'👴'},kids:[],when:'date',date:ymd(new Date()),repeat:'once',created:'2026-11-01',played:{}}];}});
   await t.putAudio('msg|m2','data:audio/webm;base64,BBBB');await wait(6500);
   assert.deepEqual(t.played,['data:audio/webm;base64,BBBB']);
-  const m=t.cfg().messages[0];assert.ok(m.played.kA&&m.played.kB,'counted as heard by both kids');t.close();
+  const ms=t.cfg().messages;assert.equal(ms.length,2,'an older both-kids message becomes one per child');
+  assert.ok(ms.every(m=>m.kids.length===1&&m.audio==='msg|m2'),'both share the one recording');
+  assert.equal(t.played.length,1);t.close();
 });
 
 test('messages tab lists messages; kids can replay heard ones from the trophy case',async()=>{
@@ -262,5 +264,16 @@ test('recording a message: asks who and when first, then shows a script with the
   const line=s2.querySelector('.scriptt').textContent;
   assert.match(line,/Surprise! It's Nana/);
   t.button('Another idea',s2).click();
-  assert.match(s2.querySelector('.scriptt').textContent,/Ava and Leo/);t.close();
+  assert.match(s2.querySelector('.scriptt').textContent,/Hello Ava!/);
+  assert.doesNotMatch(s2.querySelector('.scriptt').textContent,/Leo/);t.close();
+});
+
+test('after saving a message for one child, it offers the same for the other',async()=>{
+  const t=boot({idb:true});await wait(300);
+  t.w.eval("__medoTest.offerNextKid({id:'mx',from:{name:'Nana',emoji:'👵'},kids:['kA'],when:'day',repeat:'once',played:{}})");
+  const sh=t.d.querySelector('.pksheet');assert.match(sh.textContent,/Record one for 🐢 Leo too\?/);
+  t.button('Yes, record for Leo',sh).click();
+  const s2=t.d.querySelector('.pksheet');
+  assert.equal(s2.querySelector('input[type=text]').value,'Nana');
+  assert.match([...s2.querySelectorAll('.chip.on')].map(c=>c.textContent).join(),/Leo/);t.close();
 });

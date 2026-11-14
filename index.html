@@ -683,7 +683,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · message scripts';
+  var BOARD_VERSION='14 Nov 2026 · one message per child';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3254,6 +3254,12 @@
   // ================= Voice messages (e.g. from grandparents) =================
   // Recorded in the app, kept on this device (same store as proof photos, key "msg|id"), played when their moment comes.
   if(!cfg.messages)cfg.messages=[];
+  // one child per message: split older "both kids" messages into one each, sharing the same recording
+  (function(){var out=[],changed=false;cfg.messages.forEach(function(m){
+    var ids=m.kids&&m.kids.length?m.kids:cfg.kids.map(function(x){return x.id;});
+    if(ids.length===1&&m.kids&&m.kids.length===1){out.push(m);return;}
+    changed=true;ids.forEach(function(id,i){var c=JSON.parse(JSON.stringify(m));c.kids=[id];c.audio=m.audio||('msg|'+m.id);if(i)c.id=m.id+'-'+id;c.played={};c.played[id]=(m.played||{})[id]||[];out.push(c);});
+  });if(changed){cfg.messages=out;save('qb_cfg',cfg);}})();
   var MSG_WHEN=[['am','When they finish their morning','🌅'],['day','When they finish every quest for the day','⭐'],['surprise','A surprise after a quest, now and then','🎁'],['date','On a special date','📅'],['time','At a time each day','🕒']];
   var msgAudio=null;
   function photoGet(key,cb){photoDB(function(db){if(!db)return cb(null);try{var rq=db.transaction('p','readonly').objectStore('p').get(key);rq.onsuccess=function(){cb(rq.result?rq.result.url:null);};rq.onerror=function(){cb(null);};}catch(e){cb(null);}});}
@@ -3262,7 +3268,7 @@
   function msgUsedUp(m,kid){return m.repeat!=='every'&&((m.played||{})[kid]||[]).length>0;}
   function msgMark(m,kids){m.played=m.played||{};kids.forEach(function(id){(m.played[id]=m.played[id]||[]).push(today());});sv();}
   function playMsg(m,kids,after){
-    photoGet('msg|'+m.id,function(url){
+    photoGet(m.audio||('msg|'+m.id),function(url){
       if(!url){if(kids)msgMark(m,kids);if(after)after(true);return;}   // recording missing (e.g. restored on another device): don't keep retrying
       stopSpeaking();if(msgAudio){try{msgAudio.pause();}catch(e){}}
       var a=new Audio(url);msgAudio=a;
@@ -3326,16 +3332,17 @@
   function nameList(ids){var n=cfg.kids.filter(function(k){return ids.indexOf(k.id)>-1;}).map(function(k){return k.name;});return n.length>1?n.slice(0,-1).join(', ')+' and '+n[n.length-1]:(n[0]||'');}
   function fillScript(t,m){return t.replace(/\{kids\}/g,nameList(msgKids(m))).replace(/\{me\}/g,m.from.name||'(your name)');}
   // step 1 before recording: who it's for, when it plays, who it's from
-  function newMessageFlow(existing){
-    var m=existing||{id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[],when:'day',repeat:'once',created:today(),played:{}};
+  function newMessageFlow(existing,preset){
+    var m=existing||preset||{id:'m'+Date.now(),from:{name:(cfg.messages[0]&&cfg.messages[0].from.name)||'',emoji:(cfg.messages[0]&&cfg.messages[0].from.emoji)||'👵'},kids:[cfg.kids[0].id],when:'day',repeat:'once',created:today(),played:{}};
+    if(!m.kids||m.kids.length!==1)m.kids=[msgKids(m)[0]];
     var S=pkSheet(existing?'Record it again':'New message'),b=S.body;
     var fe=emojiBtn(m.from.emoji,function(v){m.from.emoji=v;},'people',function(){return m.from.name;});
     var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value.trim();});
     b.appendChild(el('div',{'class':'emocat'},'Who is it from?'));var r1=el('div',{'class':'row'});r1.appendChild(fe);r1.appendChild(fn);b.appendChild(r1);
     b.appendChild(el('div',{'class':'emocat'},'Who is it for?'));
     var who=el('div',{'class':'chips'});
-    function drawWho(){who.innerHTML='';cfg.kids.forEach(function(kd){var on=msgKids(m).indexOf(kd.id)>-1;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
-      c.addEventListener('click',function(){var cur=msgKids(m).slice(),i=cur.indexOf(kd.id);if(i>-1){if(cur.length>1)cur.splice(i,1);}else cur.push(kd.id);m.kids=cur.length===nKids()?[]:cur;drawWho();});who.appendChild(c);});}
+    function drawWho(){who.innerHTML='';cfg.kids.forEach(function(kd){var on=m.kids[0]===kd.id;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
+      c.addEventListener('click',function(){m.kids=[kd.id];drawWho();});who.appendChild(c);});}
     drawWho();b.appendChild(who);
     b.appendChild(el('div',{'class':'emocat'},'When should it play?'));
     var tg=el('div',{'class':'rwtypes'});
@@ -3347,14 +3354,28 @@
       if(m.when==='date'&&!m.date)m.date=today();if(m.when==='time'&&!m.time)m.time='07:30';
       S.ov.remove();
       openRecorder(m,function(url,secs){
-        m.secs=secs;
+        m.secs=secs;delete m.audio;
         photoPut('msg|'+m.id,url,function(ok){if(!ok){alertMsg('Couldn\'t save the recording on this '+devWord()+'.');return;}
-          if(!existing)cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();});
+          if(!existing)cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();
+          if(!existing)offerNextKid(m);});
       });
     }));
     b.appendChild(foot);
   }
 
+  function offerNextKid(m){
+    // another child without a message from this person for this moment yet?
+    var other=cfg.kids.filter(function(kd){return kd.id!==m.kids[0]&&!cfg.messages.some(function(x){return x.kids&&x.kids[0]===kd.id&&x.when===m.when&&x.from.name===m.from.name;});})[0];
+    if(!other)return;
+    var S=pkSheet('Saved! 💌');
+    S.body.appendChild(el('p',{'class':'sulead',style:'text-align:center;margin:6px 0 14px'},'Record one for '+other.emoji+' '+other.name+' too?'));
+    var f=el('div',{'class':'pkfoot',style:'justify-content:center'});
+    f.appendChild(sBtn('Not now','',function(){S.ov.remove();}));
+    f.appendChild(sBtn('Yes, record for '+other.name,'primary',function(){S.ov.remove();
+      newMessageFlow(null,{id:'m'+Date.now(),from:{name:m.from.name,emoji:m.from.emoji},kids:[other.id],when:m.when,date:m.date,time:m.time,repeat:m.repeat,created:today(),played:{}});}));
+    S.body.appendChild(f);
+  }
+  window.__medoTest={offerNextKid:offerNextKid}; // used by the automated tests
   // ---- recorder ----
   function openRecorder(m,onKeep){
     var S=pkSheet('Record a message'),body=S.body,chunks=[],rec=null,stream=null,url=null,timer=null,secs=0,actx=null,raf=0;
@@ -3412,6 +3433,7 @@
     cfg.messages.forEach(function(m,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
+      var forKd=cfg.kids.filter(function(x){return x.id===msgKids(m)[0];})[0];if(forKd)sm.appendChild(el('span',{'class':'tag'},'for '+forKd.emoji+' '+forKd.name));
       sm.appendChild(el('span',{'class':'tag'},msgWhenText(m)));
       if(openMsg===m.id||!m.from.name)d.open=true;
       d.addEventListener('toggle',function(){if(d.open)openMsg=m.id;else if(openMsg===m.id)openMsg=null;});
@@ -3422,8 +3444,8 @@
       b.appendChild(sField('From','',[fe,fn]));
       b.appendChild(sField('Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);}),sBtn('🎙️ Record again','',function(){newMessageFlow(m);})]));
       var who=el('div',{'class':'chips'});
-      cfg.kids.forEach(function(kd){var on=!m.kids||!m.kids.length||m.kids.indexOf(kd.id)>-1;var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
-        c.addEventListener('click',function(){var cur=msgKids(m).slice(),i=cur.indexOf(kd.id);if(i>-1){if(cur.length>1)cur.splice(i,1);}else cur.push(kd.id);m.kids=cur.length===nKids()?[]:cur;redraw();});who.appendChild(c);});
+      cfg.kids.forEach(function(kd){var on=msgKids(m).indexOf(kd.id)>-1&&msgKids(m).length===1||(msgKids(m).length>1&&msgKids(m)[0]===kd.id);var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);
+        c.addEventListener('click',function(){m.kids=[kd.id];redraw();});who.appendChild(c);});
       b.appendChild(sField('For','',[who]));
       var tg=el('div',{'class':'rwtypes'});
       MSG_WHEN.forEach(function(w){var bt=el('button',{'class':'rwtype'+(m.when===w[0]?' on':'')});bt.appendChild(el('span',{'class':'rwti'},w[2]));bt.appendChild(el('span',null,w[1]));
@@ -3435,7 +3457,8 @@
       var heard=msgKids(m).map(function(id){var kd=cfg.kids.filter(function(x){return x.id===id;})[0];var n=((m.played||{})[id]||[]).length;return kd?kd.emoji+' '+kd.name+': '+(n?'heard '+n+'×':'not yet'):'';}).filter(Boolean).join(' · ');
       b.appendChild(el('p',{'class':'status'},heard));
       var acts=el('div',{'class':'row',style:'justify-content:flex-end'});
-      acts.appendChild(sConfirm('Delete message','Tap again to delete','linkbtn',function(){photoDel('msg|'+m.id);cfg.messages.splice(idx,1);sv();renderSettings();}));
+      acts.appendChild(sConfirm('Delete message','Tap again to delete','linkbtn',function(){var key=m.audio||('msg|'+m.id);cfg.messages.splice(idx,1);
+        if(!cfg.messages.some(function(x){return (x.audio||('msg|'+x.id))===key;}))photoDel(key);sv();renderSettings();}));
       b.appendChild(acts);d.appendChild(b);lc.appendChild(d);
     });
     inner.appendChild(lc);
