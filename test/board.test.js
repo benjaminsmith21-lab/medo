@@ -307,9 +307,9 @@ test('rain is spoken by part of the day, not just "it will rain"',async()=>{
   const t=boot({fetch:u=>/api\.open-meteo\.com\/v1\/forecast/.test(u)?{ok:true,json:()=>Promise.resolve(data)}:null});
   await wait(500);t.d.getElementById('wx').click();await wait(300);
   const said=t.lastSaid(),hr=new Date().getHours();
-  if(hr<18){assert.match(said,/It will rain after lunch/);assert.match(said,/few drops tonight/);assert.match(said,/raincoat/);
+  if(hr<18){assert.match(said,/^Wear .*\. .*[Tt]ake your raincoat\. It will be \w+.*, and it will rain after lunch today\.$/);
+    assert.doesNotMatch(said,/tonight/,'tonight does not change what they wear');
     assert.match(t.d.getElementById('wxSub').textContent,/rain 90% after lunch/);}
-  else if(hr<22){assert.match(said,/few drops of rain tonight\./);assert.doesNotMatch(said,/raincoat/);}
   else assert.doesNotMatch(said,/rain/);
   t.close();
 });

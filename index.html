@@ -689,7 +689,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='14 Nov 2026 · new About page';
+  var BOARD_VERSION='14 Nov 2026 · clearer weather talk';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -4086,7 +4086,7 @@
     var extras=[];
     if(w.min<=10&&band.min>=17)extras.push(['svg:jumper','Jumper']);
     var raLeft=w===wx?rainAhead():null;
-    if(raLeft?raLeft.some(function(x){return x.day&&x.p>=40;}):w.rain>=40)extras.push(['☔','Raincoat']);
+    if(raLeft?raLeft.some(rainReal):w.rain>=40)extras.push(['☔','Raincoat']);
     if(uvPeakAhead()>=uvLimit()){extras.push(['👒','Hat']);extras.push(['🧴','Sunscreen']);}
     return {band:band,wear:wear.concat(extras)};
   }
@@ -4217,18 +4217,17 @@
     return RAIN_PARTS.map(function(pt,i){var r=wx.rp[i]||{p:-1,mm:0};return {w:pt[3],p:r.p,mm:r.mm,day:pt[0]!=='eve',left:hr<pt[2]};}).filter(function(x){return x.left&&x.p>=0;});
   }
   function joinWords(a){return a.length>1?a.slice(0,-1).join(', ')+' and '+a[a.length-1]:a[0];}
-  function rainSpeech(){
+  function rainReal(x){return x.day&&x.p>=40&&x.mm>=0.3;}    // enough to need a raincoat
+  function rainDrops(x){return x.day&&x.p>=40&&x.mm<0.3;}
+  // daytime rain in time order, e.g. "it will rain after lunch" (tonight is left out: it doesn't change what they wear)
+  function rainClause(){
     var ra=rainAhead();
-    if(!ra){if(wx.rain>=70)return 'It will rain, so take your raincoat.';if(wx.rain>=40)return 'It might rain, so take your raincoat.';return '';}
-    var will=ra.filter(function(x){return x.p>=70&&x.mm>=0.5;}),drops=ra.filter(function(x){return x.p>=70&&x.mm<0.5;}),might=ra.filter(function(x){return x.p>=40&&x.p<70;});
-    var dayWet=will.concat(drops,might).some(function(x){return x.day;}),coat=dayWet?', so take your raincoat.':'.';
-    if(will.length&&will.length===ra.length&&ra.length>1)return 'It will rain all day'+coat;
-    var out=[];
-    if(will.length)out.push('It will rain '+joinWords(will.map(function(x){return x.w;})));
-    if(drops.length)out.push((out.length?'there might be a few drops ':'There might be a few drops of rain ')+joinWords(drops.map(function(x){return x.w;})));
-    if(might.length)out.push((out.length?'it might rain ':'It might rain ')+joinWords(might.map(function(x){return x.w;})));
-    if(!out.length)return '';
-    return out.join(', and ')+coat;
+    if(!ra)return wx.rain>=70?'it will rain':wx.rain>=40?'it might rain':'';
+    var real=ra.filter(rainReal),drops=ra.filter(rainDrops),day=ra.filter(function(x){return x.day;});
+    if(real.length&&real.length===day.length&&day.length>1)return real.every(function(x){return x.p>=70;})?'it will rain all day':'it might rain all day';
+    var bits=ra.filter(function(x){return rainReal(x)||rainDrops(x);}).map(function(x){
+      return (rainReal(x)?(x.p>=70?'it will rain ':'it might rain '):'there might be a few drops ')+x.w;});
+    return joinWords(bits);
   }
   function rainSub(){   // for the card: "rain 90% after lunch"
     var ra=rainAhead();if(!ra)return wx.rain>=20?' · rain '+wx.rain+'%':'';
@@ -4237,19 +4236,25 @@
     var top=Math.max.apply(null,wet.map(function(x){return x.p;}));
     return ' · rain '+top+'%'+(wet.length===day.length&&day.length>1?'':' '+wet.map(function(x){return x.w;}).join(' & '));
   }
+  // Kids act on it in order: what to put on, what to take, then why
   function weatherSpeech(){
     var o=outfit(wx),parts=[];
-    var feel=feelWord(wx.max),wnd=windWord(wx);
-    parts.push((wx.away&&wx.place?'In '+wx.place.split(',')[0]+', today':'Today')+' will be '+feel+(wnd?' and '+wnd:'')+'.');
-    var rs=rainSpeech();if(rs)parts.push(rs);
     var SPOKEN={'Dress or skirt':'a dress or skirt','Dress & tights':'a dress and tights','T-shirt':'a t-shirt','Jumper':'a jumper',
       'Warm jacket':'a warm jacket','Scarf':'a scarf','Pants or shorts':'pants or shorts'};
     function sp(x){return SPOKEN[x[1]]||x[1].toLowerCase();}
+    function has(n){return o.wear.some(function(x){return x[1]===n;});}
     var bot=o.wear.filter(function(x){return x[2]==='b';}).map(sp);
     var items=o.wear.filter(function(x){return x[2]!=='b'&&['Raincoat','Hat','Sunscreen'].indexOf(x[1])<0;}).map(sp);
     if(bot.length)items.unshift(bot.join(' or '));
-    if(items.length){var last=items.pop();parts.push('Wear '+(items.length?items.join(', ')+(bot.length>1?', and ':' and '):'')+last+'.');}
-    if(uvPeakAhead()>=uvLimit())parts.push('The sun will be strong today, so wear sunscreen and try and play in the shade. Don\'t forget your hat!');
+    if(items.length)parts.push('Wear '+joinWords(items)+'.');
+    var acts=[];
+    if(has('Sunscreen'))acts.push('put on sunscreen');
+    if(has('Hat'))acts.push('wear your hat');
+    if(has('Raincoat'))acts.push('take your raincoat');
+    if(acts.length){var a=joinWords(acts);parts.push(a.charAt(0).toUpperCase()+a.slice(1)+'.');}
+    if(has('Sunscreen')&&uvPeakAhead()>=8)parts.push('Play in the shade at lunchtime.');
+    var wnd=windWord(wx),rc=rainClause();
+    parts.push((wx.away&&wx.place?'In '+wx.place.split(',')[0]+', it':'It')+' will be '+feelWord(wx.max)+(wnd?' and '+wnd:'')+(rc?', and '+rc:'')+' today.');
     return parts.join(' ');
   }
   function wxFreshNow(){return wx&&wx.date===today()&&Date.now()-(wx.at||0)<45*60000&&wxLocOK();}
