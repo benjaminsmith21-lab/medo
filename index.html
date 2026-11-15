@@ -695,7 +695,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · pulse and names';
+  var BOARD_VERSION='16 Nov 2026 · spoken countdown';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2142,6 +2142,34 @@
     showBanner(D.dest,what+' soon! Leave at '+fmtTime(D.leave));
     say((D.name?D.name+' soon! ':'')+'We have to leave in '+durPhrase(D.mins)+'. Time to get ready!');
   }
+  // ---- spoken countdown: "Ten minutes until we leave! Ava, have you brushed your teeth yet?" ----
+  var PARTICIPLE={ate:'eaten',went:'gone',took:'taken',did:'done',gave:'given',drank:'drunk',wrote:'written',swam:'swum',rode:'ridden',
+    drew:'drawn',sang:'sung',threw:'thrown',woke:'woken',blew:'blown',wore:'worn',ran:'run'};
+  function askDone(s){   // "You ate your breakfast" -> "have you eaten your breakfast yet?"
+    var p=pastPhrase(s),m=p.match(/^You (\S+)(.*)$/);
+    if(!m)return 'don\'t forget: '+s.label.toLowerCase()+'.';
+    return 'have you '+(PARTICIPLE[m[1]]||m[1])+m[2]+' yet?';
+  }
+  var NUMW={2:'Two',3:'Three',5:'Five',10:'Ten',15:'Fifteen',20:'Twenty'};
+  function remindLine(D,mins){
+    var out=[NUMW[mins]+' minutes until we leave'+(D.name?' for '+D.name:'')+'!'],per=curPeriod(),ready=[];
+    cfg.kids.forEach(function(kd,k){
+      var next=todaysSteps(k,per).filter(function(x){return prog.done[k].indexOf(x.id)<0;})[0];
+      if(next){if(cfg.leave.ask!==false)out.push(kd.name+', '+askDone(next));}
+      else ready.push(kd.name);
+    });
+    if(ready.length===cfg.kids.length)out.push(cfg.kids.length>1?'Everyone is ready. Great job!':'You\'re all ready. Great job!');
+    else if(ready.length)out.push(joinWords(ready)+(ready.length>1?' are':' is')+' all ready!');
+    return out.join(' ');
+  }
+  function leaveRemindCheck(){
+    var marks=(cfg.leave.remind||'').split(',').filter(Boolean).map(Number);if(!marks.length||document.hidden)return;
+    if(document.getElementById('settings').classList.contains('open'))return;
+    var D=nextDeparture();if(!D||D.mins<=0)return;
+    var mk=marks.filter(function(m){return D.mins===m;})[0];if(!mk)return;
+    var key=today()+' '+D.leave+' '+mk;try{if(localStorage.getItem('qb_remind')===key)return;localStorage.setItem('qb_remind',key);}catch(e){}
+    say(remindLine(D,mk));
+  }
   // ---------- header / countdown ----------
   function renderHeader(){
     var now=new Date();
@@ -2179,10 +2207,12 @@
     else if(mins>-90){setRoad(100);lbl.classList.add('big');road.classList.add('go');setLbl('Time to go!');}
     else hdr.classList.add('centred'); // after the morning rush: just the day and time, centred
   }
+  setTimeout(function(){try{leaveRemindCheck();}catch(e){}},3000);
   var lastDay=today();
   setInterval(function(){
     var ap=autoPeriod();
     try{headsUpCheck();}catch(e){}
+    try{leaveRemindCheck();}catch(e){}
     if(today()!==lastDay){lastDay=today();render();renderWx();fetchWx();}
     else if(ap!==lastAuto){render();}
     else renderHeader();
@@ -2802,6 +2832,8 @@
     cc.appendChild(sField('Starts','',[sSeg([['30','30 min'],['45','45 min'],['60','1 hour'],['90','1½ hours']],String(cfg.leave.window||60),function(v){cfg.leave.window=+v;sv();})]));
     cc.appendChild(sField('Who runs','',[sSeg([['🏃','🏃 Person'],['🏃‍♀️','🏃‍♀️ Girl'],['🏃‍♂️','🏃‍♂️ Boy'],['kids','Our characters']],cfg.runner.fig,function(v){cfg.runner.fig=v;sv();})]));
     cc.appendChild(sField('Flip the runner','',[sSwitch(cfg.runner.flip,function(v){cfg.runner.flip=v;sv();})]));
+    cc.appendChild(sField('Say how long is left','',[sSeg([['','Off'],['10,5','10 & 5 min'],['15,10,5','15, 10 & 5 min'],['10,5,2','10, 5 & 2 min']],cfg.leave.remind||'',function(v){cfg.leave.remind=v;sv();renderSettings();})]));
+    if(cfg.leave.remind)cc.appendChild(sField('Ask about their next quest','"Ava, have you brushed your teeth yet?"',[sSwitch(cfg.leave.ask!==false,function(v){cfg.leave.ask=v;sv();})]));
     cc.appendChild(sField('Pulse when it\'s nearly time','Gently glows in the last 10 minutes, faster in the last 3.',[sSwitch(cfg.leave.pulse!==false,function(v){cfg.leave.pulse=v;sv();})]));
     var custom=el('input',{type:'text','class':'emo',maxlength:'4',placeholder:'✏️',value:DESTS.some(function(x){return x[0]===cfg.leave.dest;})?'':cfg.leave.dest});
     custom.addEventListener('input',function(){if(custom.value.trim()){cfg.leave.dest=custom.value.trim();sv();}});
