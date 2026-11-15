@@ -773,13 +773,13 @@
     return out.join(' ');
   }
   var PRAISE_N=['Great job','Well done','Nice work','Way to go'];
-  function pick(a){return a[Math.floor(Math.random()*a.length)];}
+  function anyOf(a){return a[Math.floor(Math.random()*a.length)];}
   // mostly uses their name ("You brushed your teeth, Ava!"), sometimes a word like "superstar" for variety
   function praiseLine(s,kd){
     var r=Math.random(),nm=kd&&kd.name;
     if(nm&&r<0.45)return pastPhrase(s)+', '+nm+'!';
-    if(nm&&r<0.75)return pastPhrase(s)+'. '+pick(PRAISE_N)+', '+nm+'!';
-    return pastPhrase(s)+', '+pick(PRAISE)+'!';
+    if(nm&&r<0.75)return pastPhrase(s)+'. '+anyOf(PRAISE_N)+', '+nm+'!';
+    return pastPhrase(s)+', '+anyOf(PRAISE)+'!';
   }
 
   function defaults(){
