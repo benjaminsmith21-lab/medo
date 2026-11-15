@@ -397,3 +397,25 @@ test('spoken countdown: says the time left and asks about each child\'s next que
   assert.match(said,/, have you (gone|been|went|eaten|got|brushed|put|packed)[^?]* yet\?/);
   t.close();
 });
+
+test('video message plays full screen, then closes itself',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.arvoStart='23:59';c.messages=[{id:'v1',from:{name:'Nana',emoji:'👵'},kids:['kA'],when:'quest',quest:'teeth',repeat:'every',video:true,created:'2026-11-01',played:{}}];}});
+  await t.putAudio('msg|v1','data:video/webm;base64,VVVV');await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  [...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Brush teeth')).click();await wait(500);
+  const ov=t.d.getElementById('vidOv');assert.ok(ov,'video on screen');
+  assert.match(ov.textContent,/Nana/);
+  assert.deepEqual(t.played,['data:video/webm;base64,VVVV']);
+  ov.querySelector('video').dispatchEvent(new t.w.Event('ended'));await wait(1000);
+  assert.ok(!t.d.getElementById('vidOv'),'closes when it ends');t.close();
+});
+
+test('the recorder offers voice or video',async()=>{
+  const t=boot({idb:true});await wait(300);t.openSettings('Messages');
+  t.button('Record a new message').click();
+  [...t.d.querySelectorAll('.pksheet .rwtype')].find(b=>b.textContent.includes('Surprise')).click();
+  const sh=t.d.querySelector('.pksheet');
+  const pv=sh.querySelector('video.recprev');assert.equal(pv.style.display,'none','voice by default');
+  t.button('Video',sh).click();
+  assert.equal(pv.style.display,'');assert.match(sh.querySelector('.hint').textContent,/look at the camera/);t.close();
+});

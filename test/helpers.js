@@ -19,6 +19,7 @@ function boot(opts={}){
     w.speechSynthesis={getVoices:()=>[],cancel(){},speak(u){spoken.push(u.text);setTimeout(()=>{u.onend&&u.onend();},0);},addEventListener(){}};
     if(opts.idb){const f=require('fake-indexeddb');w.indexedDB=new f.IDBFactory();w.IDBKeyRange=f.IDBKeyRange;}
     w.Audio=function(src){this.src=src;this.play=()=>{played.push(src);return Promise.resolve();};this.pause=()=>{};};
+    w.HTMLMediaElement.prototype.play=function(){played.push(this.getAttribute('src')||this.src);return Promise.resolve();};w.HTMLMediaElement.prototype.pause=function(){};
     w.SpeechSynthesisUtterance=function(t){this.text=t;};
     w.goatcounter={count:c=>stats.push(c.path)};
     // remember every timer so a finished test can switch the board off cleanly
