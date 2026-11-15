@@ -691,7 +691,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='15 Nov 2026 · Kokoro voices';
+  var BOARD_VERSION='16 Nov 2026 · voice off the main thread';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -985,6 +985,7 @@
   function aiStatus(){
     var e=document.getElementById('aiStatus');if(!e)return;
     if(!cfg.ai.on)e.textContent='Off: using the '+devWord()+'\'s own voice.';
+    else if(AI.state==='ready'&&(AI.slowN||0)>=3)e.textContent='🐢 This voice is too slow on this '+devWord()+', so the built-in voice is filling in. Try a Piper voice instead.';
     else if(AI.state==='ready')e.textContent='✅ Natural voice ready (saved on this device, works offline).';
     else if(AI.state==='loading')e.textContent='⏳ Downloading the voice… '+(AI.pct?AI.pct+'%':'')+' (the '+devWord()+'\'s own voice is used until it is ready)';
     else if(AI.state==='error')e.textContent='⚠️ Couldn\'t load the natural voice, so the '+devWord()+'\'s own voice is being used. ('+AI.err+')';
@@ -999,15 +1000,13 @@
       // same model for every Kokoro voice: switching voices needs no new download
       if(AI.kokoro){AI.sess=kokoroSess(AI.kokoro,want);AI.voice=want;AI.state='ready';AI.cache={};AI.order=[];aiStatus();return;}
       AI.state='loading';AI.pct=0;aiStatus();
-      import('./tts/kokoro/kokoro.web.js').then(function(m){
-        m.env.wasmPaths=base+'kokoro/';
-        return m.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',
-          progress_callback:function(p){if(p&&p.status==='progress'&&/\.onnx$/.test(p.file||'')&&p.progress!=null){AI.pct=Math.round(p.progress);aiStatus();}}});
-      }).then(function(tts){
-        AI.kokoro=tts;
-        if(!isKokoro(cfg.ai.voice)){AI.state='off';aiLoad();return;}
-        AI.sess=kokoroSess(tts,cfg.ai.voice);AI.voice=cfg.ai.voice;AI.state='ready';AI.cache={};AI.order=[];aiStatus();
-      }).catch(function(e){AI.state='error';AI.failedAt=Date.now();AI.err=String((e&&e.message)||e).slice(0,120);aiStatus();});
+      kokoroWorker(function(msg){
+        if(msg.type==='progress'){AI.pct=msg.pct;aiStatus();}
+        else if(msg.type==='ready'){AI.kokoro=true;
+          if(!isKokoro(cfg.ai.voice)){AI.state='off';aiLoad();return;}
+          AI.sess=kokoroSess(true,cfg.ai.voice);AI.voice=cfg.ai.voice;AI.state='ready';AI.cache={};AI.order=[];aiStatus();}
+        else if(msg.type==='error'){AI.state='error';AI.failedAt=Date.now();AI.err=msg.msg;aiStatus();}
+      });
       return;
     }
     AI.state='loading';AI.pct=0;aiStatus();
@@ -1021,8 +1020,23 @@
       AI.sess=sess;AI.voice=want;AI.state='ready';AI.cache={};AI.order=[];aiStatus();
     }).catch(function(e){AI.state='error';AI.failedAt=Date.now();AI.err=String((e&&e.message)||e).slice(0,120);aiStatus();});
   }
-  function kokoroSess(tts,v){var id=v.slice(2);
-    return {predict:function(text){return tts.generate(text,{voice:id}).then(function(a){return a.toBlob();});}};}
+  // Kokoro lives in a background worker: the board stays responsive while it works
+  var KW=null,kwWait={},kwN=0;
+  function kokoroWorker(onStatus){
+    if(!KW){
+      try{KW=new Worker(new URL('tts/kokoro/worker.js',location.href),{type:'module'});}catch(e){onStatus({type:'error',msg:'background voice not supported'});return;}
+      KW.onmessage=function(e){var d=e.data||{};
+        if(d.type==='audio'||d.type==='fail'){var w=kwWait[d.id];delete kwWait[d.id];if(w)(d.type==='audio'?w[0](d.blob):w[1]());}
+        else if(KW.onStatus)KW.onStatus(d);};
+      KW.onerror=function(){if(KW.onStatus)KW.onStatus({type:'error',msg:'voice worker stopped'});};
+    }
+    KW.onStatus=onStatus;
+    KW.postMessage({type:'load',wasm:new URL('tts/kokoro/',location.href).href});
+  }
+  function kokoroSess(_,v){var id=v.slice(2);
+    return {predict:function(text){return new Promise(function(res,rej){
+      if(Object.keys(kwWait).length){rej();return;}   // still working on the last line: don't queue up
+      var n=++kwN;kwWait[n]=[res,rej];KW.postMessage({type:'say',id:n,text:text,voice:id});});}};}
   // Only one voice may ever speak at a time. Every new line gets a ticket number; anything still
   // arriving for an older ticket (a slow AI clip, a fallback) is thrown away instead of talking over it.
   var speechTicket=0;
@@ -1045,11 +1059,13 @@
   }
   function aiSay(text,done,tok){
     if(AI.cache[text]){aiPlay(AI.cache[text],text,tok,done);return;}
+    var late=false,slow=setTimeout(function(){late=true;AI.slowN=(AI.slowN||0)+1;aiStatus();if(tok===speechTicket)deviceSay(text,done,tok);},1200);
     AI.sess.predict(text).then(function(wav){
+      clearTimeout(slow);if(!late)AI.slowN=0;
       var url=URL.createObjectURL(wav);AI.cache[text]=url;AI.order.push(text);
       if(AI.order.length>80){var old=AI.order.shift();try{URL.revokeObjectURL(AI.cache[old]);}catch(e){}delete AI.cache[old];}
-      aiPlay(url,text,tok,done);
-    }).catch(function(){if(tok===speechTicket)deviceSay(text,done,tok);});
+      if(!late)aiPlay(url,text,tok,done);   // too slow this time: it's saved for next time
+    }).catch(function(){clearTimeout(slow);if(!late&&tok===speechTicket)deviceSay(text,done,tok);});
   }
   // say(text[, done]): done() runs once speaking finishes (or after a sensible guess if the device never reports it)
   function say(text,done){
