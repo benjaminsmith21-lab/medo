@@ -441,6 +441,7 @@ test('settings lock: hold the gear by default; a quick tap only shows a hint',as
   g.dispatchEvent(new t.w.Event('pointerdown'));await wait(300);g.dispatchEvent(new t.w.Event('pointerup'));g.click();await wait(100);
   assert.ok(!t.d.getElementById('settings').classList.contains('open'));
   assert.ok(!t.d.getElementById('gate').classList.contains('open'),'no maths question');
+  t.d.querySelector('#holdOv .holdx').click();
   g.dispatchEvent(new t.w.Event('pointerdown'));await wait(2200);
   assert.ok(t.d.getElementById('settings').classList.contains('open'));t.close();
 });
@@ -500,6 +501,21 @@ test('holding the gear shows a big progress ring in the middle of the screen',as
   const t=boot({cfg:c=>{delete c.lock;}});await wait(300);
   t.d.getElementById('gearBtn').dispatchEvent(new t.w.Event('pointerdown'));await wait(200);
   assert.ok(t.d.getElementById('holdOv').classList.contains('on'));
+  assert.ok(t.d.getElementById('holdOv').classList.contains('progress'));
   t.d.getElementById('gearBtn').dispatchEvent(new t.w.Event('pointerup'));
-  assert.ok(!t.d.getElementById('holdOv').classList.contains('on'));t.close();
+  assert.ok(t.d.getElementById('holdOv').classList.contains('prompt'),'let go early: offers the big gear');t.close();
+});
+
+test('a quick tap on the gear offers a big gear to hold in the middle; holding it opens settings',async()=>{
+  const t=boot({cfg:c=>{delete c.lock;}});await wait(300);
+  const g=t.d.getElementById('gearBtn');
+  g.dispatchEvent(new t.w.Event('pointerdown'));await wait(100);g.dispatchEvent(new t.w.Event('pointerup'));g.click();await wait(100);
+  const ov=t.d.getElementById('holdOv');assert.ok(ov.classList.contains('prompt'));
+  assert.match(ov.textContent,/hold this/);
+  const big=ov.querySelector('.holdgear');
+  big.dispatchEvent(new t.w.Event('pointerdown'));await wait(500);big.dispatchEvent(new t.w.Event('pointerup'));
+  assert.match(ov.textContent,/until the circle is full/);
+  big.dispatchEvent(new t.w.Event('pointerdown'));await wait(2200);
+  assert.ok(t.d.getElementById('settings').classList.contains('open'));
+  assert.ok(!ov.classList.contains('on'));t.close();
 });
