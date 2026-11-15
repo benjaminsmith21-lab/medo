@@ -346,3 +346,14 @@ test('first-run setup assumes nothing: no default children, town or leave time',
   const c=t.cfg();assert.equal(c.kids.length,1);assert.equal(c.kids[0].name,'Mia');assert.equal(c.days[1].leave,'08:30');assert.equal(c.loc.lat,null);
   t.close();
 });
+
+test('Kokoro voices are offered, and the board still talks if Kokoro can\'t load',async()=>{
+  const t=boot({cfg:c=>{c.ai={on:true,voice:'k:af_heart'};}});await wait(300);
+  t.openSettings('Sound');
+  const sel=[...t.d.querySelectorAll('select')].find(s=>s.querySelector('optgroup'));
+  assert.ok(sel,'grouped voice list');
+  assert.match(sel.querySelector('optgroup').label,/Kokoro/);
+  assert.equal(sel.value,'k:af_heart');
+  t.button('Play a sample').click();await wait(300);
+  assert.match(t.lastSaid(),/superstar/,'falls back to the built-in voice');t.close();
+});

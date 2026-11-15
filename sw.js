@@ -43,6 +43,15 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Voice engine files (big, rarely change): saved copy first, no background re-download.
+  if (url.pathname.includes('/tts/')) {
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+      return res;
+    })));
+    return;
+  }
+
   // Icons and the manifest: saved copy first, refreshed in the background.
   e.respondWith(
     caches.match(req).then((hit) => {

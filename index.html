@@ -691,7 +691,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='15 Nov 2026 · setup without guesses';
+  var BOARD_VERSION='15 Nov 2026 · Kokoro voices';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -976,6 +976,10 @@
     ['en_GB-alan-medium','Alan (British, male)'],['en_GB-northern_english_male-medium','Northern English (male)'],
     ['en_US-hfc_female-medium','HFC (American, female)'],['en_US-amy-medium','Amy (American, female)'],
     ['en_US-lessac-medium','Lessac (American, female)'],['en_US-ryan-medium','Ryan (American, male)'],['en_US-joe-medium','Joe (American, male)']];
+  // Kokoro: newer, more natural model (ids start with "k:"); runs on the device too
+  var KOKORO_VOICES=[['k:af_heart','Heart (American, female)'],['k:af_bella','Bella (American, female)'],['k:bf_emma','Emma (British, female)'],
+    ['k:bf_isabella','Isabella (British, female)'],['k:bm_george','George (British, male)'],['k:am_michael','Michael (American, male)']];
+  function isKokoro(v){return /^k:/.test(v||'');}
   if(!cfg.ai)cfg.ai={on:true,voice:'en_GB-jenny_dioco-medium'};
   var AI={state:'off',pct:0,voice:null,sess:null,cache:{},order:[],audio:null,token:0,err:''};
   function aiStatus(){
@@ -990,8 +994,23 @@
     if(!cfg.ai.on||AI.state==='loading')return;
     if(AI.state==='error'&&Date.now()-(AI.failedAt||0)<5*60000)return; // don't keep retrying when offline
     if(AI.state==='ready'&&AI.voice===cfg.ai.voice)return;
-    AI.state='loading';AI.pct=0;aiStatus();
     var want=cfg.ai.voice,base=new URL('tts/',location.href).href;
+    if(isKokoro(want)){
+      // same model for every Kokoro voice: switching voices needs no new download
+      if(AI.kokoro){AI.sess=kokoroSess(AI.kokoro,want);AI.voice=want;AI.state='ready';AI.cache={};AI.order=[];aiStatus();return;}
+      AI.state='loading';AI.pct=0;aiStatus();
+      import('./tts/kokoro/kokoro.web.js').then(function(m){
+        m.env.wasmPaths=base+'kokoro/';
+        return m.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',
+          progress_callback:function(p){if(p&&p.status==='progress'&&/\.onnx$/.test(p.file||'')&&p.progress!=null){AI.pct=Math.round(p.progress);aiStatus();}}});
+      }).then(function(tts){
+        AI.kokoro=tts;
+        if(!isKokoro(cfg.ai.voice)){AI.state='off';aiLoad();return;}
+        AI.sess=kokoroSess(tts,cfg.ai.voice);AI.voice=cfg.ai.voice;AI.state='ready';AI.cache={};AI.order=[];aiStatus();
+      }).catch(function(e){AI.state='error';AI.failedAt=Date.now();AI.err=String((e&&e.message)||e).slice(0,120);aiStatus();});
+      return;
+    }
+    AI.state='loading';AI.pct=0;aiStatus();
     import('./tts/piper-bundle.js').then(function(m){
       if(m.TtsSession._instance&&m.TtsSession._instance.voiceId!==want)m.TtsSession._instance=null;
       if(AI.voice&&AI.voice!==want)m.TtsSession._instance=null;
@@ -1002,6 +1021,8 @@
       AI.sess=sess;AI.voice=want;AI.state='ready';AI.cache={};AI.order=[];aiStatus();
     }).catch(function(e){AI.state='error';AI.failedAt=Date.now();AI.err=String((e&&e.message)||e).slice(0,120);aiStatus();});
   }
+  function kokoroSess(tts,v){var id=v.slice(2);
+    return {predict:function(text){return tts.generate(text,{voice:id}).then(function(a){return a.toBlob();});}};}
   // Only one voice may ever speak at a time. Every new line gets a ticket number; anything still
   // arriving for an older ticket (a slow AI clip, a fallback) is thrown away instead of talking over it.
   var speechTicket=0;
@@ -3233,11 +3254,13 @@
     mc.appendChild(sField('Voice','',[sSwitch(cfg.voice,function(v){cfg.voice=v;sv();})]));
     mc.appendChild(sField('Try it','',[sBtn('▶ Play a sample','primary',function(){var v=cfg.voice;cfg.voice=true;say('You brushed your teeth, superstar!');cfg.voice=v;})]));
     inner.appendChild(mc);
-    var ac=sCard('✨ Natural voice','About 100 MB to download once (use wifi).');
+    var ac=sCard('✨ Natural voice','About 100 MB to download once (use wifi). Kokoro is about 115 MB.');
     ac.appendChild(sField('Use the natural voice','If it can\'t load, the '+devWord()+'\'s own voice is used instead.',[sSwitch(cfg.ai.on,function(v){cfg.ai.on=v;sv();AI.failedAt=0;if(AI.state==='error')AI.state='off';if(v)aiLoad();aiStatus();})]));
-    var avs=el('select');AI_VOICES.forEach(function(v){var o=el('option',{value:v[0]},v[1]);if(v[0]===cfg.ai.voice)o.selected=true;avs.appendChild(o);});
+    var avs=el('select');
+    [['Most natural (Kokoro, new)',KOKORO_VOICES],['Natural (Piper)',AI_VOICES]].forEach(function(gr){var g=el('optgroup',{label:gr[0]});
+      gr[1].forEach(function(v){var o=el('option',{value:v[0]},v[1]);if(v[0]===cfg.ai.voice)o.selected=true;g.appendChild(o);});avs.appendChild(g);});
     avs.addEventListener('change',function(){cfg.ai.voice=avs.value;sv();AI.state='off';AI.failedAt=0;if(cfg.ai.on)aiLoad();aiStatus();});
-    ac.appendChild(sField('Which voice','',[avs]));
+    ac.appendChild(sField('Which voice','Kokoro voices sound the most natural but can take a moment longer to start talking.',[avs]));
     ac.appendChild(el('p',{'class':'status',id:'aiStatus'},''));
     setTimeout(aiStatus,0);
     inner.appendChild(ac);
@@ -3585,7 +3608,7 @@
     inner.appendChild(fc);
     // credits
     var cr=sCard('🙏 Thanks to','');
-    [['Weather','Open-Meteo.com (CC BY 4.0)','https://open-meteo.com/'],['Public holidays','Nager.Date','https://date.nager.at/'],['Natural voices','Piper, by the Rhasspy and Open Home projects','https://github.com/rhasspy/piper'],['Lettering','Chewy font (Google Fonts, SIL Open Font License)','https://fonts.google.com/specimen/Chewy']].forEach(function(x){
+    [['Weather','Open-Meteo.com (CC BY 4.0)','https://open-meteo.com/'],['Public holidays','Nager.Date','https://date.nager.at/'],['Natural voices','Piper, by the Rhasspy and Open Home projects','https://github.com/rhasspy/piper'],['Most natural voices','Kokoro-82M (Apache 2.0), with kokoro-js and ONNX Runtime','https://huggingface.co/hexgrad/Kokoro-82M'],['Lettering','Chewy font (Google Fonts, SIL Open Font License)','https://fonts.google.com/specimen/Chewy']].forEach(function(x){
       var a=el('a',{href:x[2],target:'_blank',rel:'noopener','class':'credit'},x[1]);cr.appendChild(sField(x[0],'',[a]));
     });
     inner.appendChild(cr);
