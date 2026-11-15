@@ -387,7 +387,7 @@ test('praise after a quest mostly uses the child\'s name',async()=>{
 });
 
 test('spoken countdown: says the time left and asks about each child\'s next quest',async()=>{
-  const n=new Date();const lt=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours(),n.getMinutes()+10);
+  const n=new Date();const lt=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours(),n.getMinutes()+(n.getSeconds()>45?11:10)); // still 10 minutes away when the board checks, ~4s later
   const hm=String(lt.getHours()).padStart(2,'0')+':'+String(lt.getMinutes()).padStart(2,'0');
   if(lt.getDate()!==n.getDate())return; // just before midnight: skip
   const t=boot({cfg:c=>{c.leave=Object.assign(c.leave||{},{remind:'10,5'});c.arvoStart='23:59';for(let d=0;d<7;d++)c.days[d].leave=hm;}});
