@@ -704,7 +704,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · missing recordings handled';
+  var BOARD_VERSION='16 Nov 2026 · camera preview';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3572,6 +3572,23 @@
       pv.style.display=vid?'':'none';lvl.style.display=vid?'none':'';pv.removeAttribute('src');pv.srcObject=null;pv.controls=false;
       hint.textContent=vid?'Tap the red button, look at the camera and smile. Keep it short and happy (under 30 seconds).':'Tap the red button and talk. '+(m.kids&&m.kids.length?'Say their name, smile, and keep':'Smile, and keep')+' it short and happy (under 30 seconds).';
     }
+    // video: show the camera straight away so they can frame themselves before recording
+    var VCONS={audio:true,video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}};
+    function getStream(){
+      if(stream&&stream.getTracks().some(function(t){return t.readyState==='live';}))return Promise.resolve(stream);
+      return navigator.mediaDevices.getUserMedia(vid?VCONS:{audio:true});
+    }
+    function stopStream(){try{if(stream)stream.getTracks().forEach(function(t){t.stop();});}catch(e){}stream=null;}
+    function startPreview(){
+      if(!vid||url||!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))return;
+      getStream().then(function(st){
+        if(!vid||url||!document.body.contains(S.ov)){st.getTracks().forEach(function(t){t.stop();});return;}   // switched away or closed meanwhile
+        stream=st;pv.removeAttribute('src');pv.controls=false;pv.muted=true;pv.srcObject=st;pv.classList.add('live');try{pv.play();}catch(e){}
+      }).catch(function(){hint.textContent='The camera isn\'t allowed. Allow it in the '+devWord()+'\'s settings for Medo, then try again.';});
+    }
+    // however the sheet gets closed (✕, tapping outside, Done), turn the camera and mic off
+    var guard=setInterval(function(){if(!document.body.contains(S.ov)){clearInterval(guard);if(rec&&rec.state==='recording'){rec.onstop=null;try{rec.stop();}catch(e){}}cleanup();}},800);
+    var setMode0=setMode;setMode=function(){if(!vid)stopStream();setMode0();startPreview();};
     setMode();
     function cleanup(){clearInterval(timer);cancelAnimationFrame(raf);try{if(stream)stream.getTracks().forEach(function(t){t.stop();});}catch(e){}try{if(actx)actx.close();}catch(e){}stream=null;actx=null;}
     var x=S.ov.querySelector('.tclose');x.addEventListener('click',cleanup);
@@ -3579,7 +3596,7 @@
     btn.addEventListener('click',function(){
       if(rec&&rec.state==='recording'){stop();return;}
       if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)){hint.textContent='This '+devWord()+' can\'t record from the app. Sorry!';return;}
-      navigator.mediaDevices.getUserMedia(vid?{audio:true,video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}}:{audio:true}).then(function(st){
+      getStream().then(function(st){
         stream=st;chunks=[];secs=0;
         if(vid){pv.controls=false;pv.removeAttribute('src');pv.srcObject=st;pv.classList.add('live');try{pv.play();}catch(e){}}
         var mt=(vid?['video/webm;codecs=vp8,opus','video/webm','video/mp4','']:['audio/webm;codecs=opus','audio/webm','audio/mp4','']).filter(function(t){return !t||(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t));})[0];
