@@ -45,6 +45,10 @@
   .road.go .road-fill{background:#ffd23f}
   .road.go{animation:goPulse 1.2s ease-in-out infinite}
   @keyframes goPulse{50%{box-shadow:0 0 0 5px rgba(255,210,63,.55)}}
+  .road.soon{animation:soonPulse 2.4s ease-in-out infinite}
+  .road.sooner{animation:soonPulse 1.3s ease-in-out infinite}
+  @keyframes soonPulse{50%{box-shadow:0 0 0 4px rgba(125,107,255,.55),0 0 18px rgba(125,107,255,.45)}}
+  @media (prefers-reduced-motion:reduce){.road.soon,.road.sooner,.road.go{animation:none}}
   .road-fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,#3b4a9e,#7d6bff);transition:width 1s linear}
   .mover{position:absolute;top:50%;transform:translateY(-50%);font-size:clamp(28px,4vw,44px);line-height:1;transition:left 1s linear}
   .car{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:clamp(30px,4.2vw,46px);line-height:1}
@@ -691,7 +695,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · weather in kid order';
+  var BOARD_VERSION='16 Nov 2026 · pulse and names';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -768,7 +772,15 @@
     if(obj)out.push(obj);
     return out.join(' ');
   }
-  function praiseLine(s){return pastPhrase(s)+', '+PRAISE[Math.floor(Math.random()*PRAISE.length)]+'!';}
+  var PRAISE_N=['Great job','Well done','Nice work','Way to go'];
+  function pick(a){return a[Math.floor(Math.random()*a.length)];}
+  // mostly uses their name ("You brushed your teeth, Ava!"), sometimes a word like "superstar" for variety
+  function praiseLine(s,kd){
+    var r=Math.random(),nm=kd&&kd.name;
+    if(nm&&r<0.45)return pastPhrase(s)+', '+nm+'!';
+    if(nm&&r<0.75)return pastPhrase(s)+'. '+pick(PRAISE_N)+', '+nm+'!';
+    return pastPhrase(s)+', '+pick(PRAISE)+'!';
+  }
 
   function defaults(){
     var steps=[
@@ -2046,7 +2058,7 @@
         if(rc%50===0){milestone=rc;lines.push(pastPhrase(s)+'! Wow! '+kd.name+', that is '+rc+' days of reading! That is amazing!');}
         else lines.push(pastPhrase(s)+'! That is '+rc+(rc===1?' day':' days')+' of reading. Great job!');
       }
-      else if(left>0){lines.push(praiseLine(s));}
+      else if(left>0){lines.push(praiseLine(s,kd));}
       else lines.push(pastPhrase(s)+'!');
       if(left===0){
         big=true;
@@ -2153,7 +2165,7 @@
       mover.style.transform='translateY(-50%)'+(cfg.runner.flip?' scaleX(-1)':'');
     }
     var hdr=document.querySelector('header');
-    lbl.classList.remove('big');hdr.classList.remove('centred');road.classList.remove('go');
+    lbl.classList.remove('big');hdr.classList.remove('centred');road.classList.remove('go','soon','sooner');
     function setLbl(t){if(lbl.textContent!==t){lbl.innerHTML='';lbl.appendChild(el('span',null,t));}}
     if(!leave){hdr.classList.add('centred');return;}
     var parts=leave.split(':');
@@ -2162,7 +2174,8 @@
     var window_=cfg.leave.window||60; // the runner travels to the destination over this many minutes
     var destEl=document.getElementById('dest');if(destEl.textContent!==D.dest)destEl.textContent=D.dest;
     if(mins>window_){setRoad(0);setLbl(D.name?'Leave for '+D.name+' at '+fmt(leave):'Leave at '+fmt(leave));}
-    else if(mins>0){setRoad((window_-mins)/window_*100);setLbl((D.name?D.name+' · '+fmt(leave):'Leave '+fmt(leave))+' · '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min'));}
+    else if(mins>0){if(cfg.leave.pulse!==false&&mins<=10)road.classList.add(mins<=3?'sooner':'soon');
+      setRoad((window_-mins)/window_*100);setLbl((D.name?D.name+' · '+fmt(leave):'Leave '+fmt(leave))+' · '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min'));}
     else if(mins>-90){setRoad(100);lbl.classList.add('big');road.classList.add('go');setLbl('Time to go!');}
     else hdr.classList.add('centred'); // after the morning rush: just the day and time, centred
   }
@@ -2753,7 +2766,7 @@
         b.appendChild(sField('Part of the day','',[sSeg([['am','Morning'],['pm','Afternoon']],stepPeriod(s),function(v){s.period=v;sv();renderSettings();})]));
         var sy=el('input',{type:'text',value:s.say||'',placeholder:pastPhrase({id:s.id,label:s.label}),style:'flex:1;min-width:200px'});
         sy.addEventListener('input',function(){s.say=sy.value.replace(/,?\s*(superstar|champ|legend|great job|well done|nice work)!?$/i,'');sv();});
-        b.appendChild(sField('What the voice says','Leave blank to use the suggestion.',[sy,sBtn('▶','',function(){var v=cfg.voice;cfg.voice=true;say(praiseLine(s));cfg.voice=v;})]));
+        b.appendChild(sField('What the voice says','Leave blank to use the suggestion.',[sy,sBtn('▶','',function(){var v=cfg.voice;cfg.voice=true;say(praiseLine(s,cfg.kids[0]));cfg.voice=v;})]));
         b.appendChild(sField('Proof','Photo: they snap a picture. Grown-up: you hold a button to OK it. Check them in Progress.',[sSeg([['','None'],['photo','📸 Photo'],['parent','🙋 Show a grown-up']],s.proof||'',function(v){s.proof=v;sv();})]));
         var acts=el('div',{'class':'row',style:'margin-top:8px'});
         acts.appendChild(el('span',{style:'flex:1'}));
@@ -2789,6 +2802,7 @@
     cc.appendChild(sField('Starts','',[sSeg([['30','30 min'],['45','45 min'],['60','1 hour'],['90','1½ hours']],String(cfg.leave.window||60),function(v){cfg.leave.window=+v;sv();})]));
     cc.appendChild(sField('Who runs','',[sSeg([['🏃','🏃 Person'],['🏃‍♀️','🏃‍♀️ Girl'],['🏃‍♂️','🏃‍♂️ Boy'],['kids','Our characters']],cfg.runner.fig,function(v){cfg.runner.fig=v;sv();})]));
     cc.appendChild(sField('Flip the runner','',[sSwitch(cfg.runner.flip,function(v){cfg.runner.flip=v;sv();})]));
+    cc.appendChild(sField('Pulse when it\'s nearly time','Gently glows in the last 10 minutes, faster in the last 3.',[sSwitch(cfg.leave.pulse!==false,function(v){cfg.leave.pulse=v;sv();})]));
     var custom=el('input',{type:'text','class':'emo',maxlength:'4',placeholder:'✏️',value:DESTS.some(function(x){return x[0]===cfg.leave.dest;})?'':cfg.leave.dest});
     custom.addEventListener('input',function(){if(custom.value.trim()){cfg.leave.dest=custom.value.trim();sv();}});
     cc.appendChild(sField('Running to','Or type any emoji.',[sSeg(DESTS.map(function(x){return [x[0],x[0]+' '+x[1]];}),cfg.leave.dest,function(v){cfg.leave.dest=v;custom.value='';sv();}),custom]));

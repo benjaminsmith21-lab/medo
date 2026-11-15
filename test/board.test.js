@@ -370,3 +370,18 @@ test('cool but sunny: the sun warning explains itself',async()=>{
     assert.match(said,/^It will be cool today, so wear .*jumper.*\. The sun is strong today and can burn your skin, even though it feels cool\. Put on sunscreen and wear your hat, and play in the shade at lunchtime\.$/);}
   t.close();
 });
+
+test('praise after a quest mostly uses the child\'s name',async()=>{
+  const t=boot();await wait(300);
+  const kd=t.cfg().kids[0];
+  t.d.querySelectorAll('.kcard')[0].click();
+  let named=0;
+  for(let i=0;i<3;i++){
+    const tile=t.d.querySelector('.tile:not(.done)');tile.click();await wait(150);
+    if(t.lastSaid().includes(kd.name))named++;
+    tile.click();await wait(150); // untick to try again
+  }
+  t.w.Math.random=()=>0.1;
+  t.d.querySelector('.tile:not(.done)').click();await wait(150);
+  assert.match(t.lastSaid(),new RegExp(', '+kd.name+'!$'));t.close();
+});
