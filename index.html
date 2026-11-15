@@ -574,6 +574,7 @@
   .vidbox{position:relative;width:min(92vw,900px);background:#1d2150;border-radius:24px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .vidbox video{width:100%;max-height:78vh;border-radius:16px;background:#000;display:block}
   .vidfrom{font-weight:800;font-size:22px;color:#ffd23f;margin:0 0 10px 6px}.vidbox .tclose{position:absolute;top:10px;right:10px}
+  .tag.warn{background:#5a2330;color:#ffb3c1}
   .recwho{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.recl{width:44px;font-weight:800;color:#ffd23f}
   .rwtype.on{border-color:#ffd23f;background:#3d2f12}.rwti{font-size:22px;line-height:1}
   .rwideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
@@ -703,7 +704,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · video messages';
+  var BOARD_VERSION='16 Nov 2026 · missing recordings handled';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1569,7 +1570,7 @@
       box.appendChild(rs);
     }
     // messages they've heard, to replay
-    var myMsgs=cfg.messages.filter(function(m){return ((m.played||{})[kd.id]||[]).length;});
+    var myMsgs=cfg.messages.filter(function(m){return ((m.played||{})[kd.id]||[]).length&&!msgMissing(m);});
     if(myMsgs.length){
       var mb=el('div',{'class':'tsec'});mb.appendChild(el('h3',null,'💌 My messages'));
       var mr=el('div',{'class':'trow'});
@@ -1679,7 +1680,9 @@
   function photoAll(cb){photoDB(function(db){if(!db)return cb({});var out={};
     try{var rq=db.transaction('p','readonly').objectStore('p').openCursor();
       rq.onsuccess=function(){var c=rq.result;if(c){out[c.key]=c.value.url;c.continue();}else cb(out);};rq.onerror=function(){cb(out);};}catch(e){cb(out);}});}
-  function photoPrune(){var cut=ymd(addDays(today0(),-PHOTO_DAYS));photoAll(function(m){for(var key in m)if(key.slice(0,10)<cut)photoDel(key);});}
+  function photoKeys(cb){photoDB(function(db){if(!db)return cb([]);
+    try{var rq=db.transaction('p','readonly').objectStore('p').getAllKeys();rq.onsuccess=function(){cb(rq.result||[]);};rq.onerror=function(){cb([]);};}catch(e){cb([]);}});}
+  function photoPrune(){var cut=ymd(addDays(today0(),-PHOTO_DAYS));photoKeys(function(keys){keys.forEach(function(key){if(/^\d{4}-/.test(key)&&key.slice(0,10)<cut)photoDel(key);});});}   // proof photos only, never messages
   setTimeout(photoPrune,6000);
   function stopCam(){if(proofRun&&proofRun.stream){proofRun.stream.getTracks().forEach(function(t){t.stop();});proofRun.stream=null;}}
   function closeProof(){stopCam();proofRun=null;var ov=document.getElementById('proofOv');ov.classList.remove('show');ov.innerHTML='';}
@@ -3388,9 +3391,17 @@
     v.addEventListener('ended',function(){setTimeout(close,800);});
     return v;
   }
+  var msgHave=null;   // recordings found on this device (null until checked)
+  function msgKey(m){return m.audio||('msg|'+m.id);}
+  function msgMissing(m){return !!(msgHave&&!msgHave[msgKey(m)]);}
+  function msgScan(cb){photoKeys(function(keys){msgHave={};keys.forEach(function(k){if(/^msg\|/.test(k))msgHave[k]=1;});if(cb)cb();});}
+  setTimeout(function(){msgScan();},1500);
   function playMsg(m,kids,after){
     photoGet(m.audio||('msg|'+m.id),function(url){
-      if(!url){if(kids)msgMark(m,kids);if(after)after(true);return;}   // recording missing (e.g. restored on another device): don't keep retrying
+      if(!url){   // recording gone (site data cleared, or settings restored on another device)
+        if(msgHave)delete msgHave[msgKey(m)];
+        if(!kids)alertMsg('That recording isn\'t on this '+devWord()+' any more. Record it again in Settings → Messages.');
+        if(after)after(false);return;}
       stopSpeaking();if(msgAudio){try{msgAudio.pause();}catch(e){}}
       var a=/^data:video/.test(url)?videoPlayer(url,m):new Audio(url);msgAudio=a;
       var p;try{p=a.play();}catch(e){p=null;}
@@ -3401,7 +3412,7 @@
   // after a tick: finished morning / whole day / surprise
   function msgSlot(m){return m.when+'|'+(m.when==='quest'?m.quest:m.when==='date'?m.date:m.when==='time'?m.time:'');}
   function msgSlotDone(m,kid){var sl=msgSlot(m);return cfg.messages.some(function(x){return msgSlot(x)===sl&&msgPlayedToday(x,kid);});}
-  function msgCan(m,kid){return msgKids(m).indexOf(kid)>-1&&!msgUsedUp(m,kid)&&!msgSlotDone(m,kid);}
+  function msgCan(m,kid){return !msgMissing(m)&&msgKids(m).indexOf(kid)>-1&&!msgUsedUp(m,kid)&&!msgSlotDone(m,kid);}
   function pickOne(a){return a.length?a[Math.floor(Math.random()*a.length)]:null;}
   function msgAfterTick(k,finishedPer,finishedDay,stepId){
     var kid=kidId(k),ms=cfg.messages;
@@ -3479,6 +3490,7 @@
   function saveRecording(m,isNew,url,secs){
     m.secs=secs;delete m.audio;
     photoPut('msg|'+m.id,url,function(ok){if(!ok){alertMsg('Couldn\'t save the recording on this '+devWord()+'.');return;}
+      if(msgHave)msgHave['msg|'+m.id]=1;
       if(isNew)cfg.messages.unshift(m);openMsg=m.id;sv();renderSettings();});
   }
   function newMessageFlow(existing){
@@ -3611,7 +3623,7 @@
     cfg.messages.forEach(function(m,idx){
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
-      var forKd=m.kids&&m.kids.length?cfg.kids.filter(function(x){return x.id===m.kids[0];})[0]:null;sm.appendChild(el('span',{'class':'tag'},forKd?'for '+forKd.emoji+' '+forKd.name:'for any child'));if(m.video)sm.appendChild(el('span',{'class':'tag'},'🎥 video'));
+      var forKd=m.kids&&m.kids.length?cfg.kids.filter(function(x){return x.id===m.kids[0];})[0]:null;sm.appendChild(el('span',{'class':'tag'},forKd?'for '+forKd.emoji+' '+forKd.name:'for any child'));if(m.video)sm.appendChild(el('span',{'class':'tag'},'🎥 video'));if(msgMissing(m))sm.appendChild(el('span',{'class':'tag warn'},'⚠️ recording missing'));
       sm.appendChild(el('span',{'class':'tag'},msgWhenText(m)));
       if(openMsg===m.id||!m.from.name)d.open=true;
       d.addEventListener('toggle',function(){if(d.open)openMsg=m.id;else if(openMsg===m.id)openMsg=null;});
@@ -3620,6 +3632,7 @@
       var fe=emojiBtn(m.from.emoji||'👵',function(v){m.from.emoji=v;sv();},'people',function(){return m.from.name;});
       var fn=el('input',{type:'text',value:m.from.name||'',placeholder:'e.g. Nana',maxlength:'20',style:'flex:1;min-width:140px'});fn.addEventListener('input',function(){m.from.name=fn.value;sv();sm.querySelector('.iname').textContent='From '+(fn.value||'…');});
       b.appendChild(sField('From','',[fe,fn]));
+      if(msgMissing(m))b.appendChild(el('p',{'class':'hint'},'This recording isn\'t on this '+devWord()+' any more (for example after clearing the browser\'s data). It won\'t play until it\'s recorded again.'));
       b.appendChild(sField(m.video?'Watch':'Listen','',[sBtn('▶ Play','',function(){playMsg(m,null);}),sBtn((m.video?'🎥':'🎙️')+' Record again','',function(){newMessageFlow(m);})]));
       var who=el('div',{'class':'chips'});
       cfg.kids.forEach(function(kd){var on=!!(m.kids&&m.kids[0]===kd.id);var c=el('button',{'class':'chip'+(on?' on':'')},kd.emoji+' '+kd.name);

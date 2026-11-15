@@ -419,3 +419,17 @@ test('the recorder offers voice or video',async()=>{
   t.button('Video',sh).click();
   assert.equal(pv.style.display,'');assert.match(sh.querySelector('.hint').textContent,/look at the camera/);t.close();
 });
+
+test('a deleted recording is skipped, flagged in settings, and never blocks the others',async()=>{
+  const msg=(id,n)=>({id,from:{name:n,emoji:'👵'},kids:[],when:'quest',quest:'teeth',repeat:'every',created:'2026-11-01',played:{}});
+  const t=boot({idb:true,cfg:c=>{c.arvoStart='23:59';c.messages=[msg('gone','Nana'),msg('here','Pop')];}});
+  await t.putAudio('msg|here','data:audio/webm;base64,POPP');await wait(2000);   // msg|gone was never saved (as if deleted)
+  t.d.querySelectorAll('.kcard')[0].click();
+  for(let i=0;i<3;i++){const tile=[...t.d.querySelectorAll('.tile')].find(x=>x.textContent.includes('Brush teeth'));
+    if(!tile.classList.contains('done'))tile.click();await wait(300);tile.click();await wait(200);
+    const c=t.cfg();c.messages.forEach(m=>m.played={});}
+  assert.ok(t.played.length>=1);assert.ok(t.played.every(u=>u==='data:audio/webm;base64,POPP'),'only the one that exists plays');
+  t.openSettings('Messages');
+  assert.match(t.d.getElementById('settings').textContent,/recording missing/);
+  assert.equal(t.errors.length,0);t.close();
+});
