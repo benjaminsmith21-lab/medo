@@ -387,7 +387,8 @@ test('praise after a quest mostly uses the child\'s name',async()=>{
 });
 
 test('spoken countdown: says the time left and asks about each child\'s next quest',async()=>{
-  const n=new Date();const lt=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours(),n.getMinutes()+(n.getSeconds()>45?11:10)); // still 10 minutes away when the board checks, ~4s later
+  while(new Date().getSeconds()>40)await wait(1000);   // start early in a minute so it's still "10 minutes" when the board checks ~4s later
+  const n=new Date();const lt=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours(),n.getMinutes()+10);
   const hm=String(lt.getHours()).padStart(2,'0')+':'+String(lt.getMinutes()).padStart(2,'0');
   if(lt.getDate()!==n.getDate())return; // just before midnight: skip
   const t=boot({cfg:c=>{c.leave=Object.assign(c.leave||{},{remind:'10,5'});c.arvoStart='23:59';for(let d=0;d<7;d++)c.days[d].leave=hm;}});
@@ -467,4 +468,14 @@ test('messages can be filtered by who they are from',async()=>{
   const sel=[...t.d.querySelectorAll('.msgfilt select')][0];sel.value='Pop';sel.dispatchEvent(new t.w.Event('change'));
   const names=[...t.d.querySelectorAll('#settings .iname')].map(x=>x.textContent);
   assert.deepEqual(names,['From Pop','From Pop']);t.close();
+});
+
+test('setting a PIN uses the app\'s own keypad, not the device keyboard',async()=>{
+  const t=boot();await wait(300);t.openSettings('This device');
+  t.button('PIN',t.d.getElementById('settings')).click();await wait(100);
+  const sh=t.d.querySelector('.pksheet');
+  assert.ok(!sh.querySelector('input'),'no text box to bring up the keyboard');
+  const key=k=>[...sh.querySelectorAll('.keypad button')].find(b=>b.textContent===k).click();
+  '4321'.split('').forEach(key);await wait(300);'4321'.split('').forEach(key);await wait(500);
+  const c=t.cfg();assert.equal(c.lock.type,'pin');assert.match(c.lock.pin,/^[0-9a-f]{64}$/);t.close();
 });

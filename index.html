@@ -342,7 +342,7 @@
   .gate-q{font-size:30px;font-weight:800;margin:6px 0 12px}
   #gateInput{font-family:inherit;font-size:34px;font-weight:800;width:140px;text-align:center;padding:8px;border-radius:14px;border:2px solid #444b8a;background:#0e1130;color:#fff;caret-color:transparent;outline:none;pointer-events:none}
   #gateInput.shake{animation:gshake .4s}
-  .pinin{display:block;margin:6px auto;width:160px;text-align:center;font-size:34px;letter-spacing:14px;font-weight:800}
+  .pindots{display:flex;justify-content:center;gap:16px;margin:8px 0 2px}.pindots span{width:20px;height:20px;border-radius:50%;border:3px solid #7d6bff}.pindots span.on{background:#ffd23f;border-color:#ffd23f}
   #gearBtn{position:relative;touch-action:none;-webkit-user-select:none;user-select:none}
   #gearBtn.holding::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:conic-gradient(#ffd23f var(--p,0%),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);animation:holdRing 2s linear forwards}
   @property --p{syntax:'<percentage>';inherits:false;initial-value:0%}
@@ -711,7 +711,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · settings lock options';
+  var BOARD_VERSION='16 Nov 2026 · PIN keypad';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3831,14 +3831,25 @@
     var S=pkSheet('Set a PIN'),b=S.body,first=null,ok=false;
     if(lead)b.appendChild(el('p',{'class':'hint'},lead));
     var lbl=el('p',{'class':'susub',style:'text-align:center'},'Choose 4 numbers');b.appendChild(lbl);
-    var inp=el('input',{type:'password',inputmode:'numeric',pattern:'[0-9]*',maxlength:'4',autocomplete:'off','class':'pinin'});b.appendChild(inp);
-    var msg=el('p',{'class':'hint',style:'text-align:center'},'');b.appendChild(msg);
-    inp.addEventListener('input',function(){inp.value=inp.value.replace(/\D/g,'').slice(0,4);if(inp.value.length<4)return;
-      var v=inp.value;inp.value='';
+    // the app's own number pad, never the device keyboard
+    var typed='',dots=el('div',{'class':'pindots'});b.appendChild(dots);
+    var msg=el('p',{'class':'hint',style:'text-align:center;min-height:1.4em'},'');b.appendChild(msg);
+    function drawDots(){dots.innerHTML='';for(var i=0;i<4;i++)dots.appendChild(el('span',{'class':i<typed.length?'on':''}));}
+    function entered(v){
       if(first===null){first=v;lbl.textContent='Type it again';msg.textContent='';return;}
       if(v!==first){first=null;lbl.textContent='Choose 4 numbers';msg.textContent='They didn\'t match. Try again.';return;}
-      sha(v,function(h){cfg.lock.pin=h;sv();ok=true;S.ov.remove();alertMsg('PIN saved.');done(true);});});
-    setTimeout(function(){inp.focus();},100);
+      sha(v,function(h){cfg.lock.pin=h;sv();ok=true;S.ov.remove();alertMsg('PIN saved.');done(true);});
+    }
+    var pad=el('div',{'class':'keypad'});
+    ['1','2','3','4','5','6','7','8','9','del','0',''].forEach(function(k){
+      var bt=el('button',k==='del'?{'class':'kfn','aria-label':'Delete'}:k===''?{style:'visibility:hidden'}:null,k==='del'?'⌫':k);
+      bt.addEventListener('click',function(){
+        if(k==='del'){typed=typed.slice(0,-1);drawDots();return;}
+        if(!k||typed.length>=4)return;
+        typed+=k;msg.textContent='';drawDots();
+        if(typed.length===4){var v=typed;setTimeout(function(){typed='';drawDots();entered(v);},200);}
+      });pad.appendChild(bt);});
+    b.appendChild(pad);drawDots();
     var obs=setInterval(function(){if(!document.body.contains(S.ov)){clearInterval(obs);if(!ok)done(false);}},500);
   }
   function setDevice(inner){
