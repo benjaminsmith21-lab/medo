@@ -691,7 +691,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · voice off the main thread';
+  var BOARD_VERSION='16 Nov 2026 · weather in kid order';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -4297,7 +4297,8 @@
     var top=Math.max.apply(null,wet.map(function(x){return x.p;}));
     return ' · rain '+top+'%'+(wet.length===day.length&&day.length>1?'':' '+wet.map(function(x){return x.w;}).join(' & '));
   }
-  // Kids act on it in order: what to put on, what to take, then why
+  // One idea per sentence, each with its reason first, so a 4-year-old can follow:
+  // "It will be cool today, so wear… / The sun is strong… so put on sunscreen… / It might rain… so take your raincoat."
   function weatherSpeech(){
     var o=outfit(wx),parts=[];
     var SPOKEN={'Dress or skirt':'a dress or skirt','Dress & tights':'a dress and tights','T-shirt':'a t-shirt','Jumper':'a jumper',
@@ -4307,15 +4308,16 @@
     var bot=o.wear.filter(function(x){return x[2]==='b';}).map(sp);
     var items=o.wear.filter(function(x){return x[2]!=='b'&&['Raincoat','Hat','Sunscreen'].indexOf(x[1])<0;}).map(sp);
     if(bot.length)items.unshift(bot.join(' or '));
-    if(items.length)parts.push('Wear '+joinWords(items)+'.');
-    var acts=[];
-    if(has('Sunscreen'))acts.push('put on sunscreen');
-    if(has('Hat'))acts.push('wear your hat');
-    if(has('Raincoat'))acts.push('take your raincoat');
-    if(acts.length){var a=joinWords(acts);parts.push(a.charAt(0).toUpperCase()+a.slice(1)+'.');}
-    if(has('Sunscreen')&&uvPeakAhead()>=8)parts.push('Play in the shade at lunchtime.');
-    var wnd=windWord(wx),rc=rainClause();
-    parts.push((wx.away&&wx.place?'In '+wx.place.split(',')[0]+', it':'It')+' will be '+feelWord(wx.max)+(wnd?' and '+wnd:'')+(rc?', and '+rc:'')+' today.');
+    var feel=feelWord(wx.max),wnd=windWord(wx);
+    var lead=(wx.away&&wx.place?'In '+wx.place.split(',')[0]+', it':'It')+' will be '+feel+(wnd?' and '+wnd:'')+' today';
+    parts.push(items.length?lead+', so wear '+joinWords(items)+'.':lead+'.');
+    if(has('Sunscreen')){
+      var chilly=wx.max<17;   // cool or colder: kids think sun only matters when it's hot
+      parts.push('The sun is strong today'+(chilly?' and can burn your skin, even though it feels '+(wx.max<11?'cold':'cool'):'')+'.');
+      parts.push('Put on sunscreen'+(has('Hat')?' and wear your hat':'')+(uvPeakAhead()>=8?', and play in the shade at lunchtime':'')+'.');
+    }
+    var rc=rainClause();
+    if(rc)parts.push(rc.charAt(0).toUpperCase()+rc.slice(1)+(has('Raincoat')?', so take your raincoat.':'.'));
     return parts.join(' ');
   }
   function wxFreshNow(){return wx&&wx.date===today()&&Date.now()-(wx.at||0)<45*60000&&wxLocOK();}

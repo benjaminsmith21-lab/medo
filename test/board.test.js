@@ -307,7 +307,7 @@ test('rain is spoken by part of the day, not just "it will rain"',async()=>{
   const t=boot({fetch:u=>/api\.open-meteo\.com\/v1\/forecast/.test(u)?{ok:true,json:()=>Promise.resolve(data)}:null});
   await wait(500);t.d.getElementById('wx').click();await wait(300);
   const said=t.lastSaid(),hr=new Date().getHours();
-  if(hr<18){assert.match(said,/^Wear .*\. .*[Tt]ake your raincoat\. It will be \w+.*, and it will rain after lunch today\.$/);
+  if(hr<18){assert.match(said,/^It will be \w+( and \w+)? today, so wear .*\. .*It will rain after lunch, so take your raincoat\.$/);
     assert.doesNotMatch(said,/tonight/,'tonight does not change what they wear');
     assert.match(t.d.getElementById('wxSub').textContent,/rain 90% after lunch/);}
   else assert.doesNotMatch(said,/rain/);
@@ -356,4 +356,17 @@ test('Kokoro voices are offered, and the board still talks if Kokoro can\'t load
   assert.equal(sel.value,'k:af_heart');
   t.button('Play a sample').click();await wait(300);
   assert.match(t.lastSaid(),/superstar/,'falls back to the built-in voice');t.close();
+});
+
+test('cool but sunny: the sun warning explains itself',async()=>{
+  const td=ymd(new Date()),time=[],z=[],uv=[];
+  for(let h=0;h<24;h++){time.push(td+'T'+String(h).padStart(2,'0')+':00');z.push(0);uv.push(h>=6&&h<=20?9:0);}
+  const data={current:{temperature_2m:13,weather_code:1},daily:{temperature_2m_max:[15],temperature_2m_min:[8],precipitation_probability_max:[0],uv_index_max:[9],weather_code:[1],wind_speed_10m_max:[5],wind_gusts_10m_max:[10]},
+    hourly:{time,precipitation_probability:z,precipitation:z,weather_code:z.map(()=>1),uv_index:uv}};
+  const t=boot({fetch:u=>/v1\/forecast/.test(u)?{ok:true,json:()=>Promise.resolve(data)}:null});
+  await wait(500);t.d.getElementById('wx').click();await wait(300);
+  const said=t.lastSaid();
+  if(new Date().getHours()<20){
+    assert.match(said,/^It will be cool today, so wear .*jumper.*\. The sun is strong today and can burn your skin, even though it feels cool\. Put on sunscreen and wear your hat, and play in the shade at lunchtime\.$/);}
+  t.close();
 });
