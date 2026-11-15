@@ -349,7 +349,8 @@
   @keyframes holdRing{to{--p:100%}}
   #holdOv{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:rgba(8,10,30,.7);pointer-events:none}
   #holdOv.on{display:flex}#holdOv.prompt{pointer-events:auto}
-  #holdOv .holdwrap{position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center}
+  #holdOv .holdwrap{position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-user-select:none;user-select:none;cursor:pointer}
+  #holdOv .holdring,#holdOv .holdgear{pointer-events:none}
   #holdOv .holdring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#ffd23f var(--p,0%),rgba(255,255,255,.15) 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 18px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 18px),#000 0)}
   #holdOv.fill .holdring{animation:holdRing 2s linear forwards}
   #holdOv .holdgear{display:none;width:120px;height:120px;border-radius:50%;border:none;background:#343b78;font-size:64px;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;box-shadow:0 6px 0 #1f2452}
@@ -720,7 +721,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · clearer hold to open';
+  var BOARD_VERSION='16 Nov 2026 · hold to open fixed';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2456,6 +2457,12 @@
   }
   // the gear: what a tap or a hold does depends on the lock
   var holdT=null,holdStart=0;
+  // Settings opens while the finger is still down. When it lifts, the tap would land on whatever is now under it
+  // (the Done button sits right where the gear was), so swallow that one tap.
+  var swallowArmed=false,swallowUntil=0;
+  function openFromHold(){openSettings();swallowArmed=true;setTimeout(function(){swallowArmed=false;},10000);}
+  document.addEventListener('pointerup',function(){if(swallowArmed){swallowArmed=false;swallowUntil=Date.now()+500;}},true);
+  document.addEventListener('click',function(e){if(swallowArmed||Date.now()<swallowUntil){e.stopPropagation();e.preventDefault();swallowUntil=0;swallowArmed=false;}},true);
   function gearTap(){
     var L=cfg.lock.type;
     if(L==='pin'&&cfg.lock.pin)gateOpen('pin');
@@ -2465,7 +2472,7 @@
   gear.addEventListener('pointerdown',function(){
     if(cfg.lock.type!=='hold')return;
     holdStart=Date.now();gear.classList.add('holding');holdOv('progress');
-    holdT=setTimeout(function(){holdT=null;gear.classList.remove('holding');holdOv(false);openSettings();},2000);
+    holdT=setTimeout(function(){holdT=null;gear.classList.remove('holding');holdOv(false);openFromHold();},2000);
   });
   // one overlay for holding: "progress" while the small ⚙️ is held, "prompt" after a quick tap
   // (then the big ⚙️ in the middle is the one to hold, and its ring is wider than a finger)
@@ -2478,12 +2485,12 @@
     hov.appendChild(el('div',{'class':'holdtxt'}));
     var x=el('button',{'class':'linkbtn holdx'},'Cancel');hov.appendChild(x);
     function done(){clearTimeout(hovT);hovT=null;}
-    big.addEventListener('pointerdown',function(e){e.preventDefault();clearTimeout(hovIdle);done();hov.classList.remove('fill');void hov.offsetWidth;hov.classList.add('fill');
+    wrap.addEventListener('pointerdown',function(e){e.preventDefault();clearTimeout(hovIdle);done();hov.classList.remove('fill');void hov.offsetWidth;hov.classList.add('fill');
       hov.querySelector('.holdtxt').textContent='Keep holding…';
-      hovT=setTimeout(function(){done();holdOv(false);openSettings();},2000);});
+      hovT=setTimeout(function(){done();holdOv(false);openFromHold();},2000);});
     function early(){if(!hovT)return;done();hov.classList.remove('fill');hov.querySelector('.holdtxt').textContent='Keep holding until the circle is full';hovArm();}
-    big.addEventListener('pointerup',early);big.addEventListener('pointerleave',early);big.addEventListener('pointercancel',early);
-    big.addEventListener('contextmenu',function(e){e.preventDefault();});
+    wrap.addEventListener('pointerup',early);wrap.addEventListener('pointerleave',early);wrap.addEventListener('pointercancel',early);
+    wrap.addEventListener('contextmenu',function(e){e.preventDefault();});
     x.addEventListener('click',function(){holdOv(false);});
     hov.addEventListener('click',function(e){if(e.target===hov&&Date.now()-hovAt>500)holdOv(false);});
     document.body.appendChild(hov);return hov;

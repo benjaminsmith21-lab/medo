@@ -512,10 +512,22 @@ test('a quick tap on the gear offers a big gear to hold in the middle; holding i
   g.dispatchEvent(new t.w.Event('pointerdown'));await wait(100);g.dispatchEvent(new t.w.Event('pointerup'));g.click();await wait(100);
   const ov=t.d.getElementById('holdOv');assert.ok(ov.classList.contains('prompt'));
   assert.match(ov.textContent,/hold this/);
-  const big=ov.querySelector('.holdgear');
+  const big=ov.querySelector('.holdwrap');   // the whole ring is the target (a real finger lands on the ring as often as the gear)
   big.dispatchEvent(new t.w.Event('pointerdown'));await wait(500);big.dispatchEvent(new t.w.Event('pointerup'));
   assert.match(ov.textContent,/until the circle is full/);
   big.dispatchEvent(new t.w.Event('pointerdown'));await wait(2200);
   assert.ok(t.d.getElementById('settings').classList.contains('open'));
   assert.ok(!ov.classList.contains('on'));t.close();
+});
+
+test('lifting the finger after a hold does not tap the Done button underneath',async()=>{
+  const t=boot({cfg:c=>{delete c.lock;}});await wait(300);
+  const g=t.d.getElementById('gearBtn');
+  g.dispatchEvent(new t.w.Event('pointerdown'));await wait(2200);
+  assert.ok(t.d.getElementById('settings').classList.contains('open'));
+  const done=t.d.getElementById('closeSettings');
+  done.dispatchEvent(new t.w.Event('pointerup',{bubbles:true}));done.click();   // the finger lifting off
+  assert.ok(t.d.getElementById('settings').classList.contains('open'),'still open');
+  await wait(600);done.click();
+  assert.ok(!t.d.getElementById('settings').classList.contains('open'),'a real tap on Done still works');t.close();
 });
