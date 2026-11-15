@@ -347,6 +347,11 @@
   #gearBtn.holding::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:conic-gradient(#ffd23f var(--p,0%),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);animation:holdRing 2s linear forwards}
   @property --p{syntax:'<percentage>';inherits:false;initial-value:0%}
   @keyframes holdRing{to{--p:100%}}
+  #holdOv{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:rgba(8,10,30,.55);pointer-events:none}
+  #holdOv.on{display:flex}
+  #holdOv .holdring{width:150px;height:150px;border-radius:50%;background:conic-gradient(#ffd23f var(--p,0%),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 16px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 16px),#000 0)}
+  #holdOv.on .holdring{animation:holdRing 2s linear forwards}
+  #holdOv .holdtxt{font-weight:800;font-size:24px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}
   @keyframes gshake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
   .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px auto 4px;max-width:300px}
   .keypad button{height:62px;border:none;border-radius:16px;background:#343b78;color:#fff;font-family:inherit;font-size:28px;font-weight:800;cursor:pointer;box-shadow:0 4px 0 #1f2452;touch-action:manipulation;-webkit-user-select:none;user-select:none}
@@ -711,7 +716,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · PIN keypad';
+  var BOARD_VERSION='16 Nov 2026 · past events and hold ring';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2455,10 +2460,13 @@
   }
   gear.addEventListener('pointerdown',function(){
     if(cfg.lock.type!=='hold')return;
-    holdStart=Date.now();gear.classList.add('holding');
-    holdT=setTimeout(function(){holdT=null;gear.classList.remove('holding');openSettings();},2000);
+    holdStart=Date.now();gear.classList.add('holding');holdOv(true);
+    holdT=setTimeout(function(){holdT=null;gear.classList.remove('holding');holdOv(false);openSettings();},2000);
   });
-  function holdEnd(){if(holdT){clearTimeout(holdT);holdT=null;gear.classList.remove('holding');
+  function holdOv(on){var o=document.getElementById('holdOv');
+    if(!o){o=el('div',{id:'holdOv'});o.appendChild(el('div',{'class':'holdring'}));o.appendChild(el('div',{'class':'holdtxt'},'⚙️ Keep holding…'));document.body.appendChild(o);}
+    o.classList.remove('on');if(on){void o.offsetWidth;o.classList.add('on');}}
+  function holdEnd(){if(holdT){clearTimeout(holdT);holdT=null;gear.classList.remove('holding');holdOv(false);
     if(Date.now()-holdStart<2000)showBanner('⚙️','Grown-ups: hold the ⚙️ for 2 seconds');}}
   gear.addEventListener('pointerup',holdEnd);gear.addEventListener('pointerleave',holdEnd);gear.addEventListener('pointercancel',holdEnd);
   gear.addEventListener('contextmenu',function(e){e.preventDefault();});
@@ -2928,6 +2936,7 @@
   }
 
   // ---------- Events ----------
+  var evF={q:'',kid:'',kind:'',pastOpen:false};
   function setEvents(inner){
     sHead(inner,'Events');
     var kb=sCard('🎂 Your children\'s birthdays');
@@ -2941,12 +2950,38 @@
     inner.appendChild(kb);
     var ec=sCard('Your events','');
     var t0=today0();
-    cfg.events.forEach(function(ev,idx){
+    // finished events go in their own folded-up list, ready to use again
+    var evs=cfg.events.map(function(ev,idx){var nx=ev.date?nextOccurrence(ev,t0):null;return {ev:ev,idx:idx,next:nx,past:!!(ev.date&&!nx)};});
+    var nPast=evs.filter(function(x){return x.past;}).length;
+    if(cfg.events.length>5){
+      var fr=el('div',{'class':'msgfilt'});
+      var q=el('input',{type:'search',placeholder:'🔍 Search events',value:evF.q,style:'flex:1;min-width:160px'});
+      q.addEventListener('input',function(){evF.q=q.value;clearTimeout(evF.t);evF.t=setTimeout(function(){renderSettings();var nq=document.querySelector('#settings input[type=search]');if(nq){nq.focus();nq.setSelectionRange(nq.value.length,nq.value.length);}},400);});
+      fr.appendChild(q);
+      function fsel(key,label,opts){var sl=el('select',{'aria-label':label});[['',label+': all']].concat(opts).forEach(function(o){var op=el('option',{value:o[0]},o[1]);if(evF[key]===o[0])op.selected=true;sl.appendChild(op);});
+        sl.addEventListener('change',function(){evF[key]=sl.value;renderSettings();});fr.appendChild(sl);}
+      fsel('kid','For',cfg.kids.map(function(kd,k){return [String(k),kd.emoji+' '+kd.name];}));
+      fsel('kind','Kind',[['once','One-off'],['repeat','Repeating'],['birthday','Birthdays']]);
+      ec.appendChild(fr);
+    }
+    function evShow(ev){
+      if(evF.q&&(ev.name||'').toLowerCase().indexOf(evF.q.toLowerCase())<0)return false;
+      if(evF.kid&&ev.kids&&ev.kids.length&&ev.kids.indexOf(+evF.kid)<0)return false;
+      var r=rep_(ev);if(evF.kind==='once'&&r!=='none'||evF.kind==='repeat'&&(r==='none'||r==='birthday')||evF.kind==='birthday'&&r!=='birthday')return false;
+      return true;
+    }
+    var pc=sCard('🗂️ Past events ('+nPast+')'),pd=el('details',{'class':'item pastlist'}),pBody=el('div',{'class':'body'});
+    pd.appendChild(el('summary',null,'Show finished events'));pd.appendChild(pBody);pc.appendChild(pd);
+    if(evF.pastOpen)pd.open=true;pd.addEventListener('toggle',function(){evF.pastOpen=pd.open;});
+    // upcoming: soonest first; new (no date yet) at the top
+    evs.sort(function(a,b){if(a.past!==b.past)return a.past?1:-1;if(!a.next||!b.next)return a.next?1:b.next?-1:0;return a.next-b.next;});
+    var shownN=0;
+    evs.forEach(function(x){
+      var ev=x.ev,idx=x.idx;if(!evShow(ev))return;shownN++;
       var d=el('details',{'class':'item'}),sm=el('summary');
-      var r=rep_(ev),next=ev.date?nextOccurrence(ev,t0):null,past=ev.date&&!next;
+      var r=rep_(ev),next=x.next,past=x.past;
       sm.appendChild(el('span',{'class':'iic'},ev.emoji||'📅'));sm.appendChild(el('span',{'class':'iname'},ev.name||'New event'));
       sm.appendChild(el('span',{'class':'tag'},(past?'Finished · ':'')+repeatSummary(ev)));
-      if(past)d.style.opacity='.5';
       if(!ev.date||!ev.name||openEvent===ev.id)d.open=true;
       d.addEventListener('toggle',function(){if(d.open)openEvent=ev.id;else if(openEvent===ev.id)openEvent=null;});
       d.appendChild(sm);var b=el('div',{'class':'body'});
@@ -3036,9 +3071,12 @@
       })();
       b.appendChild(sField('Weather location','Uses that town\'s weather '+(r==='none'?'for these days':'on these days')+'.',[lcBox]));
       var acts=el('div',{'class':'row',style:'justify-content:flex-end;margin-top:6px'});
+      if(past)acts.appendChild(sBtn('↻ Use again with a new date','primary',function(){
+        ev.date='';ev.end='';if(ev.endMode==='on')ev.endMode='never';delete ev.until;openEvent=ev.id;evQuestCache.day='';sv();renderSettings();}));
       acts.appendChild(sConfirm('Delete event','Tap again to delete','linkbtn',function(){cfg.events.splice(idx,1);evQuestCache.day='';sv();renderSettings();}));
-      b.appendChild(acts);d.appendChild(b);ec.appendChild(d);
+      b.appendChild(acts);d.appendChild(b);(past?pBody:ec).appendChild(d);
     });
+    if(cfg.events.length&&!shownN)ec.appendChild(el('p',{'class':'muted'},'No events match.'));
     var adds=el('div',{'class':'row',style:'margin-top:8px'});
     [['🎂','Someone\'s birthday','birthday'],['⚽','Sport / activity','weekly'],['🎈','Party','none'],['🧸','Playdate','none'],['🏖️','Holiday','none'],['⭐','Other','none']].forEach(function(p){
       adds.appendChild(sBtn('+ '+p[0]+' '+p[1],'',function(){
@@ -3048,6 +3086,7 @@
       }));
     });
     ec.appendChild(adds);inner.appendChild(ec);
+    if(nPast)inner.appendChild(pc);
 
     var hc=sCard('Public holidays','');
     hc.appendChild(sField('Show public holidays','',[sSwitch(cfg.holidays.on,function(v){cfg.holidays.on=v;sv();fetchHolidays();})]));

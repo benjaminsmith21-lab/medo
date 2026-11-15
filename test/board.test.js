@@ -479,3 +479,27 @@ test('setting a PIN uses the app\'s own keypad, not the device keyboard',async()
   '4321'.split('').forEach(key);await wait(300);'4321'.split('').forEach(key);await wait(500);
   const c=t.cfg();assert.equal(c.lock.type,'pin');assert.match(c.lock.pin,/^[0-9a-f]{64}$/);t.close();
 });
+
+test('finished events move to Past events and can be used again; events can be searched',async()=>{
+  const mk=(id,name,date)=>({id,emoji:'🎈',name,date,end:'',repeat:'none',lead:'',endMode:'never'});
+  const fut=ymd(new Date(Date.now()+5*864e5));
+  const t=boot({cfg:c=>{c.events=[mk('p1','Old party','2026-01-10'),mk('f1','Swim carnival',fut),mk('f2','Zoo trip',fut),mk('f3','Dentist',fut),mk('f4','Concert',fut),mk('f5','Library day',fut)];}});
+  await wait(300);t.openSettings('Events');
+  const S=t.d.getElementById('settings');
+  assert.match(S.textContent,/Past events \(1\)/);
+  const past=S.querySelector('.pastlist');assert.match(past.textContent,/Old party/);
+  past.open=true;t.button('Use again',past).click();
+  const ev=t.cfg().events.find(e=>e.id==='p1');assert.equal(ev.date,'');
+  assert.doesNotMatch(t.d.getElementById('settings').textContent,/Past events/);
+  const q=t.d.querySelector('#settings input[type=search]');q.value='zoo';q.dispatchEvent(new t.w.Event('input'));await wait(600);
+  const names=[...t.d.querySelectorAll('#settings .iname')].map(x=>x.textContent);
+  assert.deepEqual(names,['Zoo trip']);t.close();
+});
+
+test('holding the gear shows a big progress ring in the middle of the screen',async()=>{
+  const t=boot({cfg:c=>{delete c.lock;}});await wait(300);
+  t.d.getElementById('gearBtn').dispatchEvent(new t.w.Event('pointerdown'));await wait(200);
+  assert.ok(t.d.getElementById('holdOv').classList.contains('on'));
+  t.d.getElementById('gearBtn').dispatchEvent(new t.w.Event('pointerup'));
+  assert.ok(!t.d.getElementById('holdOv').classList.contains('on'));t.close();
+});
