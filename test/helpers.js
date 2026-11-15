@@ -18,6 +18,8 @@ function boot(opts={}){
       const r=opts.fetch&&opts.fetch(u);if(r)return Promise.resolve(r);return Promise.reject(new Error('offline'));};
     w.speechSynthesis={getVoices:()=>[],cancel(){},speak(u){spoken.push(u.text);setTimeout(()=>{u.onend&&u.onend();},0);},addEventListener(){}};
     if(opts.idb){const f=require('fake-indexeddb');w.indexedDB=new f.IDBFactory();w.IDBKeyRange=f.IDBKeyRange;}
+    try{Object.defineProperty(w,'crypto',{value:require('crypto').webcrypto,configurable:true});}catch(e){}
+    w.TextEncoder=w.TextEncoder||TextEncoder;
     w.Audio=function(src){this.src=src;this.play=()=>{played.push(src);return Promise.resolve();};this.pause=()=>{};};
     w.HTMLMediaElement.prototype.play=function(){played.push(this.getAttribute('src')||this.src);return Promise.resolve();};w.HTMLMediaElement.prototype.pause=function(){};
     w.SpeechSynthesisUtterance=function(t){this.text=t;};
@@ -34,7 +36,7 @@ function boot(opts={}){
     cfg:()=>JSON.parse(w.localStorage.getItem('qb_cfg')),
     lastSaid:()=>spoken[spoken.length-1]||'',
     openSettings(tab){d.getElementById('gearBtn').click();const m=d.getElementById('gateQ').textContent.match(/(\d+) × (\d+)/);
-      d.getElementById('gateInput').value=String(m[1]*m[2]);d.getElementById('gateOk').click();
+      String(m[1]*m[2]).split('').forEach(k=>d.querySelector(`#gateKeys button[data-k="${k}"]`).click());d.getElementById('gateOk').click();
       if(tab)[...d.querySelectorAll('#sNav button')].find(b=>b.textContent.includes(tab)).click();},
     button:(text,root)=>[...(root||d).querySelectorAll('button')].find(b=>b.textContent.trim()===text||b.textContent.includes(text)),
     close(){closedAny=true;w.fetch=()=>new Promise(()=>{});w.__timers.forEach(id=>{w.clearTimeout(id);w.clearInterval(id);});w.__closed=true;

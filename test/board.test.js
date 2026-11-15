@@ -433,3 +433,38 @@ test('a deleted recording is skipped, flagged in settings, and never blocks the 
   assert.match(t.d.getElementById('settings').textContent,/recording missing/);
   assert.equal(t.errors.length,0);t.close();
 });
+
+test('settings lock: hold the gear by default; a quick tap only shows a hint',async()=>{
+  const t=boot({cfg:c=>{delete c.lock;}});await wait(300);
+  const g=t.d.getElementById('gearBtn');
+  g.dispatchEvent(new t.w.Event('pointerdown'));await wait(300);g.dispatchEvent(new t.w.Event('pointerup'));g.click();await wait(100);
+  assert.ok(!t.d.getElementById('settings').classList.contains('open'));
+  assert.ok(!t.d.getElementById('gate').classList.contains('open'),'no maths question');
+  g.dispatchEvent(new t.w.Event('pointerdown'));await wait(2200);
+  assert.ok(t.d.getElementById('settings').classList.contains('open'));t.close();
+});
+
+test('settings lock: PIN opens settings; a wrong PIN does not; forgot PIN asks harder maths',async()=>{
+  const h=require('crypto').createHash('sha256').update('medo:2580').digest('hex');
+  const t=boot({cfg:c=>{c.lock={type:'pin',pin:h};}});await wait(300);
+  const key=k=>t.d.querySelector(`#gateKeys button[data-k="${k}"]`).click();
+  t.d.getElementById('gearBtn').click();
+  assert.match(t.d.getElementById('gateQ').textContent,/PIN/);
+  '1111'.split('').forEach(key);await wait(400);
+  assert.ok(!t.d.getElementById('settings').classList.contains('open'));
+  '2580'.split('').forEach(key);await wait(400);
+  assert.ok(t.d.getElementById('settings').classList.contains('open'));
+  t.d.getElementById('closeSettings').click();
+  t.d.getElementById('gearBtn').click();t.d.getElementById('gateForgot').click();
+  const m=t.d.getElementById('gateQ').textContent.match(/(\d+) × (\d+)/);assert.ok(+m[1]>=12,'harder question');
+  t.close();
+});
+
+test('messages can be filtered by who they are from',async()=>{
+  const mk=(id,n,v)=>({id,from:{name:n,emoji:'👵'},kids:[],when:'day',repeat:'once',video:v,created:'2026-11-01',played:{}});
+  const t=boot({cfg:c=>{c.messages=[mk('a','Nana'),mk('b','Pop',true),mk('c','Nana'),mk('d','Gong'),mk('e','Pop')];}});await wait(300);
+  t.openSettings('Messages');
+  const sel=[...t.d.querySelectorAll('.msgfilt select')][0];sel.value='Pop';sel.dispatchEvent(new t.w.Event('change'));
+  const names=[...t.d.querySelectorAll('#settings .iname')].map(x=>x.textContent);
+  assert.deepEqual(names,['From Pop','From Pop']);t.close();
+});

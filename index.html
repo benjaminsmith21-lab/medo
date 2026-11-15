@@ -342,6 +342,11 @@
   .gate-q{font-size:30px;font-weight:800;margin:6px 0 12px}
   #gateInput{font-family:inherit;font-size:34px;font-weight:800;width:140px;text-align:center;padding:8px;border-radius:14px;border:2px solid #444b8a;background:#0e1130;color:#fff;caret-color:transparent;outline:none;pointer-events:none}
   #gateInput.shake{animation:gshake .4s}
+  .pinin{display:block;margin:6px auto;width:160px;text-align:center;font-size:34px;letter-spacing:14px;font-weight:800}
+  #gearBtn{position:relative;touch-action:none;-webkit-user-select:none;user-select:none}
+  #gearBtn.holding::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:conic-gradient(#ffd23f var(--p,0%),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);animation:holdRing 2s linear forwards}
+  @property --p{syntax:'<percentage>';inherits:false;initial-value:0%}
+  @keyframes holdRing{to{--p:100%}}
   @keyframes gshake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
   .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px auto 4px;max-width:300px}
   .keypad button{height:62px;border:none;border-radius:16px;background:#343b78;color:#fff;font-family:inherit;font-size:28px;font-weight:800;cursor:pointer;box-shadow:0 4px 0 #1f2452;touch-action:manipulation;-webkit-user-select:none;user-select:none}
@@ -574,6 +579,7 @@
   .vidbox{position:relative;width:min(92vw,900px);background:#1d2150;border-radius:24px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .vidbox video{width:100%;max-height:78vh;border-radius:16px;background:#000;display:block}
   .vidfrom{font-weight:800;font-size:22px;color:#ffd23f;margin:0 0 10px 6px}.vidbox .tclose{position:absolute;top:10px;right:10px}
+  .msgfilt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px}.msgfilt select{max-width:220px}
   .tag.warn{background:#5a2330;color:#ffb3c1}
   .recwho{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.recl{width:44px;font-weight:800;color:#ffd23f}
   .rwtype.on{border-color:#ffd23f;background:#3d2f12}.rwti{font-size:22px;line-height:1}
@@ -693,6 +699,7 @@
       <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
       <button data-k="del" class="kfn" aria-label="Delete">⌫</button><button data-k="0">0</button><button id="gateOk" class="kok" aria-label="Open settings">✓</button>
     </div>
+    <button class="linkbtn" id="gateForgot" style="display:none">Forgot the PIN?</button>
     <button class="linkbtn gate-cancel" id="gateCancel">Cancel</button>
   </div>
 </div>
@@ -704,7 +711,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · camera preview';
+  var BOARD_VERSION='16 Nov 2026 · settings lock options';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -2380,6 +2387,7 @@
   document.getElementById('dt').addEventListener('click',showClock);
 
   // ---------- fullscreen ----------
+  if(isInstalled())document.getElementById('fsBtn').style.display='none';   // the installed app is already full screen
   document.getElementById('fsBtn').addEventListener('click',function(){
     keepAwake();
     try{
@@ -2391,22 +2399,70 @@
 
   // ---------- grown-up gate for settings ----------
   var gear=document.getElementById('gearBtn'),gate=document.getElementById('gate');
-  var gA=0,gB=0,gInput=document.getElementById('gateInput'),gQ=document.getElementById('gateQ'),gMsg=document.getElementById('gateMsg');
-  gear.addEventListener('click',function(){
-    gA=6+Math.floor(Math.random()*4);gB=6+Math.floor(Math.random()*4);
-    gQ.textContent='What is '+gA+' × '+gB+'?';
-    gInput.value='';gMsg.textContent='';
+  // How grown-ups get in (This device → Settings lock): hold the gear, a PIN, fingerprint/face, or a maths question
+  if(!cfg.lock)cfg.lock={type:'hold'};
+  var gA=0,gB=0,gMode='maths',gInput=document.getElementById('gateInput'),gQ=document.getElementById('gateQ'),gMsg=document.getElementById('gateMsg');
+  var gTyped='';
+  function sha(t,cb){try{crypto.subtle.digest('SHA-256',new TextEncoder().encode('medo:'+t)).then(function(h){cb(Array.from(new Uint8Array(h)).map(function(x){return x.toString(16).padStart(2,'0');}).join(''));}).catch(function(){cb('p:'+t);});}catch(e){cb('p:'+t);}}
+  function gateOpen(mode){
+    gMode=mode;gTyped='';gInput.value='';gMsg.textContent='';
+    var fg=document.getElementById('gateForgot');if(fg)fg.style.display=mode==='pin'?'':'none';
+    if(mode==='pin')gQ.textContent='Enter your PIN';
+    else{ // maths: also the way back in if the PIN is forgotten (harder, so it's still grown-ups only)
+      if(mode==='recover'){gA=12+Math.floor(Math.random()*8);gB=6+Math.floor(Math.random()*4);}
+      else{gA=6+Math.floor(Math.random()*4);gB=6+Math.floor(Math.random()*4);}
+      gQ.textContent='What is '+gA+' × '+gB+'?';
+    }
     gate.classList.add('open');
-  });
+  }
+  function gatePass(){gate.classList.remove('open');openSettings();if(gMode==='recover'){sTab='device';renderSettings();alertMsg('You can set a new PIN under Settings lock.');}}
+  function gateFail(t){gMsg.textContent=t||'Not quite, try again';gTyped='';gInput.value='';gInput.classList.remove('shake');void gInput.offsetWidth;gInput.classList.add('shake');}
   function checkGate(){
-    if(parseInt(gInput.value,10)===gA*gB){gate.classList.remove('open');openSettings();}
-    else{gMsg.textContent='Not quite, try again';gInput.value='';gInput.classList.remove('shake');void gInput.offsetWidth;gInput.classList.add('shake');}
+    if(!gate.classList.contains('open'))return;
+    if(gMode==='pin'){sha(gTyped,function(h){if(h===cfg.lock.pin)gatePass();else gateFail('That\'s not the PIN');});return;}
+    if(parseInt(gTyped,10)===gA*gB)gatePass();else gateFail();
   }
   function gateKey(k){
     gMsg.textContent='';
-    if(k==='del')gInput.value=gInput.value.slice(0,-1);
-    else if(gInput.value.length<3){gInput.value+=k;if(gInput.value.length===String(gA*gB).length)setTimeout(checkGate,180);}  // answers are always 2 digits: check as soon as both are in
+    if(k==='del')gTyped=gTyped.slice(0,-1);
+    else if(gTyped.length<(gMode==='pin'?4:3)){gTyped+=k;
+      var full=gMode==='pin'?4:String(gA*gB).length;if(gTyped.length===full)setTimeout(checkGate,180);}
+    gInput.value=gMode==='pin'?'•'.repeat(gTyped.length):gTyped;
   }
+  // fingerprint / face, using the device's own screen lock (no account, nothing leaves the device)
+  function b64(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
+  function unb64(t){return Uint8Array.from(atob(t),function(c){return c.charCodeAt(0);});}
+  function bioAvailable(cb){try{if(!window.PublicKeyCredential||!PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable)return cb(false);
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(cb).catch(function(){cb(false);});}catch(e){cb(false);}}
+  function bioRegister(cb){
+    try{navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:'Medo'},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'Medo grown-up',displayName:'Medo grown-up'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000}})
+      .then(function(c){cb(c?b64(c.rawId):null);}).catch(function(){cb(null);});}catch(e){cb(null);}
+  }
+  function bioCheck(cb){
+    try{navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:'public-key',id:unb64(cfg.lock.cred)}],userVerification:'required',timeout:60000}})
+      .then(function(a){var ad=a&&a.response&&new Uint8Array(a.response.authenticatorData);cb(!!(ad&&ad.length>32&&(ad[32]&4)));}).catch(function(){cb(false);});}catch(e){cb(false);}
+  }
+  // the gear: what a tap or a hold does depends on the lock
+  var holdT=null,holdStart=0;
+  function gearTap(){
+    var L=cfg.lock.type;
+    if(L==='pin'&&cfg.lock.pin)gateOpen('pin');
+    else if(L==='bio'&&cfg.lock.cred){bioCheck(function(ok){if(ok)openSettings();else if(cfg.lock.pin)gateOpen('pin');});}
+    else gateOpen('maths');
+  }
+  gear.addEventListener('pointerdown',function(){
+    if(cfg.lock.type!=='hold')return;
+    holdStart=Date.now();gear.classList.add('holding');
+    holdT=setTimeout(function(){holdT=null;gear.classList.remove('holding');openSettings();},2000);
+  });
+  function holdEnd(){if(holdT){clearTimeout(holdT);holdT=null;gear.classList.remove('holding');
+    if(Date.now()-holdStart<2000)showBanner('⚙️','Grown-ups: hold the ⚙️ for 2 seconds');}}
+  gear.addEventListener('pointerup',holdEnd);gear.addEventListener('pointerleave',holdEnd);gear.addEventListener('pointercancel',holdEnd);
+  gear.addEventListener('contextmenu',function(e){e.preventDefault();});
+  gear.addEventListener('click',function(){if(cfg.lock.type!=='hold')gearTap();});
   [].forEach.call(document.querySelectorAll('#gateKeys button[data-k]'),function(b){b.addEventListener('click',function(){gateKey(b.getAttribute('data-k'));});});
   document.addEventListener('keydown',function(e){   // a real keyboard still works (e.g. on a laptop)
     if(!gate.classList.contains('open'))return;
@@ -2414,6 +2470,7 @@
   });
   document.getElementById('gateOk').addEventListener('click',checkGate);
   document.getElementById('gateCancel').addEventListener('click',function(){gate.classList.remove('open');});
+  document.getElementById('gateForgot').addEventListener('click',function(){gateOpen('recover');});
 
   // ---------- settings ----------
   var sDay=new Date().getDay();
@@ -3629,7 +3686,14 @@
     if(m.when==='quest'){var st=cfg.steps.filter(function(x){return x.id===m.quest;})[0];return 'After '+(st?(st.emoji||'')+' '+st.label:'a quest');}
     return (MSG_WHEN.filter(function(x){return x[0]===m.when;})[0]||['','',''])[1];
   }
-  var openMsg=null;
+  var openMsg=null,msgF={from:'',kid:'',when:'',type:''};
+  function msgShow(m){
+    if(msgF.from&&(m.from.name||'')!==msgF.from)return false;
+    if(msgF.kid&&(msgF.kid==='*'?(m.kids&&m.kids.length):!(m.kids&&m.kids[0]===msgF.kid)))return false;
+    if(msgF.when&&m.when!==msgF.when)return false;
+    if(msgF.type==='voice'&&m.video||msgF.type==='video'&&!m.video||msgF.type==='missing'&&!msgMissing(m))return false;
+    return true;
+  }
   function setMessages(inner){
     sHead(inner,'Messages');
     var nc=sCard();nc.classList.add('reccard');
@@ -3637,7 +3701,23 @@
     inner.appendChild(nc);
     var lc=sCard('Messages');
     if(!cfg.messages.length)lc.appendChild(el('p',{'class':'muted'},'No messages yet.'));
+    // filters, once there are enough messages to need them
+    if(cfg.messages.length>4){
+      var fr=el('div',{'class':'msgfilt'});
+      function fsel(key,label,opts){var sl=el('select',{'aria-label':label});[['',label+': all']].concat(opts).forEach(function(o){var op=el('option',{value:o[0]},o[1]);if(msgF[key]===o[0])op.selected=true;sl.appendChild(op);});
+        sl.addEventListener('change',function(){msgF[key]=sl.value;renderSettings();});fr.appendChild(sl);}
+      var froms=[];cfg.messages.forEach(function(m){var n=m.from.name||'';if(n&&froms.indexOf(n)<0)froms.push(n);});
+      fsel('from','From',froms.map(function(n){return [n,n];}));
+      fsel('kid','For',[['*','Any child']].concat(cfg.kids.map(function(kd){return [kd.id,kd.emoji+' '+kd.name];})));
+      var whens=[];cfg.messages.forEach(function(m){if(whens.indexOf(m.when)<0)whens.push(m.when);});
+      fsel('when','When',MSG_WHEN.filter(function(w){return whens.indexOf(w[0])>-1;}).map(function(w){return [w[0],w[1]];}));
+      fsel('type','Type',[['voice','🎙️ Voice'],['video','🎥 Video']].concat(cfg.messages.some(msgMissing)?[['missing','⚠️ Missing']]:[]));
+      if(msgF.from||msgF.kid||msgF.when||msgF.type){var clr=el('button',{'class':'linkbtn'},'Clear');clr.addEventListener('click',function(){msgF={from:'',kid:'',when:'',type:''};renderSettings();});fr.appendChild(clr);}
+      lc.appendChild(fr);
+    }
+    var shown=0;
     cfg.messages.forEach(function(m,idx){
+      if(!msgShow(m))return;shown++;
       var d=el('details',{'class':'item'}),sm=el('summary');
       sm.appendChild(el('span',{'class':'iic'},m.from.emoji||'💌'));sm.appendChild(el('span',{'class':'iname'},'From '+(m.from.name||'…')));
       var forKd=m.kids&&m.kids.length?cfg.kids.filter(function(x){return x.id===m.kids[0];})[0]:null;sm.appendChild(el('span',{'class':'tag'},forKd?'for '+forKd.emoji+' '+forKd.name:'for any child'));if(m.video)sm.appendChild(el('span',{'class':'tag'},'🎥 video'));if(msgMissing(m))sm.appendChild(el('span',{'class':'tag warn'},'⚠️ recording missing'));
@@ -3671,6 +3751,7 @@
         if(!cfg.messages.some(function(x){return (x.audio||('msg|'+x.id))===key;}))photoDel(key);sv();renderSettings();}));
       b.appendChild(acts);d.appendChild(b);lc.appendChild(d);
     });
+    if(cfg.messages.length&&!shown)lc.appendChild(el('p',{'class':'muted'},'No messages match.'));
     inner.appendChild(lc);
   }
   function alertMsg(t){showBanner('⚠️',t);}
@@ -3745,6 +3826,21 @@
   }
 
   // ---------- This device ----------
+  // set a 4-digit PIN: type it, then type it again
+  function pinSetup(done,lead){
+    var S=pkSheet('Set a PIN'),b=S.body,first=null,ok=false;
+    if(lead)b.appendChild(el('p',{'class':'hint'},lead));
+    var lbl=el('p',{'class':'susub',style:'text-align:center'},'Choose 4 numbers');b.appendChild(lbl);
+    var inp=el('input',{type:'password',inputmode:'numeric',pattern:'[0-9]*',maxlength:'4',autocomplete:'off','class':'pinin'});b.appendChild(inp);
+    var msg=el('p',{'class':'hint',style:'text-align:center'},'');b.appendChild(msg);
+    inp.addEventListener('input',function(){inp.value=inp.value.replace(/\D/g,'').slice(0,4);if(inp.value.length<4)return;
+      var v=inp.value;inp.value='';
+      if(first===null){first=v;lbl.textContent='Type it again';msg.textContent='';return;}
+      if(v!==first){first=null;lbl.textContent='Choose 4 numbers';msg.textContent='They didn\'t match. Try again.';return;}
+      sha(v,function(h){cfg.lock.pin=h;sv();ok=true;S.ov.remove();alertMsg('PIN saved.');done(true);});});
+    setTimeout(function(){inp.focus();},100);
+    var obs=setInterval(function(){if(!document.body.contains(S.ov)){clearInterval(obs);if(!ok)done(false);}},500);
+  }
   function setDevice(inner){
     sHead(inner,'This device');
     var ic=sCard('📲 Install as an app');
@@ -3754,6 +3850,25 @@
       ic.appendChild(el('p',{'class':'hint'},'Android: Chrome menu ⋮ → "Install app" (or "Add to Home screen"). iPhone / iPad: Safari → Share → "Add to Home Screen".'));
     }
     inner.appendChild(ic);
+    // ---- settings lock ----
+    var lk=sCard('🔒 Settings lock'),L=cfg.lock.type;
+    var LOCKS=[['hold','Hold ⚙️'],['pin','PIN'],['bio','Fingerprint / face'],['maths','Maths question']];
+    var lseg=sSeg(LOCKS,L,function(v){
+      if(v==='hold'||v==='maths'){cfg.lock.type=v;sv();renderSettings();return;}
+      if(v==='pin'){pinSetup(function(ok){if(ok){cfg.lock.type='pin';sv();}renderSettings();});return;}
+      if(v==='bio'){bioAvailable(function(av){
+        if(!av){alertMsg('This '+devWord()+' has no fingerprint or face unlock Medo can use.');renderSettings();return;}
+        var go=function(){bioRegister(function(id){if(id){cfg.lock.cred=id;cfg.lock.type='bio';sv();}else alertMsg('Fingerprint wasn\'t set up.');renderSettings();});};
+        if(cfg.lock.pin)go();else pinSetup(function(ok){if(ok)go();else renderSettings();},'First, a backup PIN for when the fingerprint doesn\'t work.');
+      });}
+    });
+    lk.appendChild(sField('How grown-ups open settings','',[lseg]));
+    lk.appendChild(el('p',{'class':'hint'},{hold:'Press and hold the ⚙️ for 2 seconds. Easy for you, but an older child who watches may work it out.',
+      pin:'A 4-digit PIN. If you forget it, "Forgot the PIN?" asks a harder maths question instead.',
+      bio:'Uses this '+devWord()+'\'s own fingerprint or face unlock, with your PIN as a backup.',
+      maths:'A times-table question, like 7 × 8.'}[L]));
+    if(L==='pin'||L==='bio')lk.appendChild(sBtn('Change PIN','',function(){pinSetup(function(){renderSettings();});}));
+    inner.appendChild(lk);
     var lc=sCard();
     lc.appendChild(sField('Home screen layout','',[sSeg([['hybrid','Card per child'],['split','All children side by side']],cfg.layout||'hybrid',function(v){cfg.layout=v;view=-1;sv();})]));
     inner.appendChild(lc);
