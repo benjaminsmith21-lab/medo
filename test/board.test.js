@@ -615,3 +615,18 @@ test('new rewards start as a surprise and are announced as one',async()=>{
   const r=t.cfg().rewards.slice(-1)[0];assert.equal(r.show,false);
   assert.match(t.d.getElementById('settings').textContent,/Surprise/);t.close();
 });
+
+test('evening: the card shows what to sleep in tonight and what to lay out for tomorrow',async()=>{
+  const td=ymd(new Date()),tm=ymd(new Date(Date.now()+864e5)),time=[],pp=[],mm=[],code=[],uv=[],tp=[];
+  for(const d of [td,tm])for(let h=0;h<24;h++){time.push(d+'T'+String(h).padStart(2,'0')+':00');pp.push(0);mm.push(0);code.push(0);uv.push(d===tm&&h>=9&&h<=16?8:0);tp.push(h>=20||h<=6?7:20);}
+  const data={current:{temperature_2m:15,weather_code:0},daily:{temperature_2m_max:[18,27],temperature_2m_min:[9,12],precipitation_probability_max:[0,0],uv_index_max:[2,8],weather_code:[0,0],wind_speed_10m_max:[5,5],wind_gusts_10m_max:[10,10]},
+    hourly:{time,precipitation_probability:pp,precipitation:mm,weather_code:code,uv_index:uv,temperature_2m:tp}};
+  const t=boot({cfg:c=>{c.eveStart='00:00';},fetch:u=>/v1\/forecast/.test(u)?{ok:true,json:()=>Promise.resolve(data)}:null});
+  await wait(600);
+  assert.match(t.d.getElementById('wxTitle').textContent,/Tonight & tomorrow/);
+  const wear=t.d.getElementById('wxWear').textContent;
+  assert.match(wear,/Warm pyjamas/);assert.match(wear,/Socks/);assert.match(wear,/Sunscreen/,'tomorrow is sunny');
+  t.d.getElementById('wx').click();await wait(300);
+  assert.match(t.lastSaid(),/^Tonight will be cold, so wear warm pyjamas and socks\. Tomorrow will be (warm|hot), so lay out .*your hat\. You'll need sunscreen in the morning too\.$/);
+  t.close();
+});

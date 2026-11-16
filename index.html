@@ -566,6 +566,7 @@
   #gearBtn.hasnote::before{content:attr(data-n);position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#ff5a7a;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #1b1f3b}
   .navcount{margin-left:auto;background:#ff5a7a;color:#fff;border-radius:10px;padding:1px 8px;font-size:13px;font-weight:800}
   .notehead{font-weight:800;font-size:18px;margin-bottom:6px}.noteqs{margin:4px 0 12px 18px;line-height:1.7;color:#e6e8ff}
+  .weargrp{align-self:center;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#ffd23f;writing-mode:vertical-rl;transform:rotate(180deg);padding:0 4px;opacity:.9}
   .suvoices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 6px}
   .suvoice{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:18px;font-weight:800;cursor:pointer}
   .suvoice.on{border-color:#ffd23f;background:#3d3a7a}.suvplay{width:34px;height:34px;border-radius:50%;background:#ffd23f;color:#1b1f3b;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
@@ -761,7 +762,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · psychologist tweaks';
+  var BOARD_VERSION='16 Nov 2026 · evening clothes';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1266,7 +1267,7 @@
   function hasReading(k){for(var d=0;d<7;d++)if(cfg.days[d].kids[k].indexOf('reading')>-1)return true;return false;}
   function outfitChip(k){
     if(!wx||wx.date!==today())return null;
-    var o=outfit(wx,k);
+    var o=isEvening()?outfit(wx.tm,k):outfit(wx,k);
     var chip=el('div',{'class':'ochip'});chip.style.background=o.band.colour;
     o.wear.forEach(function(x,i){var ic=iconEl(x[0],'kicon');if(i)chip.appendChild(document.createTextNode(' '));chip.appendChild(ic);});
     chip.title=o.band.name;
@@ -2422,11 +2423,12 @@
     else hdr.classList.add('centred'); // after the morning rush: just the day and time, centred
   }
   setTimeout(function(){try{leaveRemindCheck();}catch(e){}},3000);
-  var lastDay=today();
+  var lastDay=today(),lastEve=false;
   setInterval(function(){
     var ap=autoPeriod();
     try{headsUpCheck();}catch(e){}
     try{leaveRemindCheck();}catch(e){}
+    var ev_=isEvening();if(ev_!==lastEve){lastEve=ev_;renderWx();if(view>=0)render();}   // switch to the evening card on time
     if(today()!==lastDay){lastDay=today();render();renderWx();fetchWx();}
     else if(ap!==lastAuto){render();}
     else renderHeader();
@@ -3689,6 +3691,7 @@
     inner.appendChild(lc);
     var uc=sCard('Temperature');
     uc.appendChild(sField('Show temperatures in','',[sSeg([['C','°C'],['F','°F']],useF()?'F':'C',function(v){cfg.units=v;sv();renderWx();renderSettings();})]));
+    uc.appendChild(sField('Evening starts at','After this, the card shows what to sleep in tonight and what to lay out for tomorrow.',[(function(){var i=el('input',{type:'time',value:cfg.eveStart||'17:30',required:'required'});i.addEventListener('change',function(){if(i.value){cfg.eveStart=i.value;sv();renderWx();}});return i;})()]));
     inner.appendChild(uc);
     var sc=sCard('Sunscreen');
     sc.appendChild(sField('Add the sunscreen quest automatically','Only on days the UV gets high enough.',[sSwitch(cfg.autoSun!==false,function(v){cfg.autoSun=v;sv();})]));
@@ -4718,7 +4721,7 @@
     if(w.min<=10&&band.min>=17)extras.push(['svg:jumper','Jumper']);
     var raLeft=w===wx?rainAhead():null;
     if(raLeft?raLeft.some(rainReal):w.rain>=40)extras.push(['☔','Raincoat']);
-    if(uvPeakAhead()>=uvLimit()){extras.push(['👒','Hat']);extras.push(['🧴','Sunscreen']);}
+    if((w===wx?uvPeakAhead():(w.uv||0))>=uvLimit()){extras.push(['👒','Hat']);extras.push(['🧴','Sunscreen']);}
     return {band:band,wear:wear.concat(extras)};
   }
   // ----- Where are we? Home, unless an event with its own location is on today -----
@@ -4805,6 +4808,32 @@
     say(m);
   });
 
+  // ---- evening: what to sleep in tonight, and what to lay out for tomorrow ----
+  function isEvening(){
+    if(!wx||wx.date!==today()||!wx.tm)return false;
+    var n=new Date(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    return hm>=(cfg.eveStart||'17:30');
+  }
+  function pjs(t){   // by how cold it gets overnight
+    if(t==null)return [['🌙','Pyjamas']];
+    if(t<=8)return [['🌙','Warm pyjamas'],['🧦','Socks']];
+    if(t<=14)return [['🌙','Warm pyjamas']];
+    if(t<=19)return [['🌙','Pyjamas']];
+    return [['🌙','Light pyjamas']];
+  }
+  function eveningSpeech(){
+    var n=wx.night,tw=n==null?'':n<=8?'cold':n<=14?'cool':n<=19?'mild':'warm';
+    var pj=pjs(n).map(function(x){return x[1].toLowerCase();});
+    var parts=[(tw?'Tonight will be '+tw+', so wear ':'Tonight, wear ')+joinWords(pj)+'.'];
+    var o=outfit(wx.tm),SP={'Dress or skirt':'a dress or skirt','Dress & tights':'a dress and tights','T-shirt':'a t-shirt','Jumper':'a jumper','Warm jacket':'a warm jacket','Scarf':'a scarf','Pants or shorts':'pants or shorts'};
+    var sp=function(x){return SP[x[1]]||x[1].toLowerCase();},has=function(nm){return o.wear.some(function(x){return x[1]===nm;});};
+    var bot=o.wear.filter(function(x){return x[2]==='b';}).map(sp),items=o.wear.filter(function(x){return x[2]!=='b'&&x[1]!=='Sunscreen';}).map(function(x){return x[1]==='Hat'?'your hat':x[1]==='Raincoat'?'your raincoat':sp(x);});
+    if(bot.length)items.unshift(bot.join(' or '));
+    var wnd=windWord(wx.tm),rainy=wx.tm.rain>=60?' and rainy':wx.tm.rain>=40?', maybe with some rain,':'';
+    parts.push('Tomorrow will be '+feelWord(wx.tm.max)+(wnd?' and '+wnd:'')+rainy+' so lay out '+joinWords(items)+'.');
+    if(has('Sunscreen'))parts.push('You\'ll need sunscreen in the morning too.');
+    return parts.join(' ').replace(' so lay out',', so lay out').replace(',, so',', so');
+  }
   function renderWx(){
     renderUV();
     var box=document.getElementById('wx');
@@ -4820,6 +4849,7 @@
       return;
     }
     box.classList.remove('off');
+    if(isEvening()){renderEvening(box);return;}
     var o=outfit(wx);
     box.style.setProperty('--wc',o.band.colour);
     document.getElementById('wxIcon').textContent=wxIcon(wx.code);
@@ -4837,6 +4867,19 @@
     o.wear.forEach(function(x){
       var d=el('div',{'class':'wear'});d.appendChild(iconEl(x[0],'e'));d.appendChild(el('div',{'class':'t'},x[1]));wr.appendChild(d);
     });
+  }
+  function renderEvening(box){
+    var o=outfit(wx.tm);
+    box.style.setProperty('--wc','#8f86ff');
+    document.getElementById('wxIcon').textContent='🌙';
+    document.getElementById('wxTemp').textContent='';
+    document.getElementById('wxTitle').textContent='Tonight & tomorrow';
+    var sub='Tonight '+tmp(wx.night)+' · Tomorrow '+tmp(wx.tm.min)+'→'+tmp(wx.tm.max)+(wx.tm.rain>=20?' · rain '+wx.tm.rain+'%':'')+(wx.tm.uv>=1?' · UV '+Math.round(wx.tm.uv):'');
+    document.getElementById('wxSub').textContent=sub;
+    var wr=document.getElementById('wxWear');wr.innerHTML='';
+    function chip(x){var d=el('div',{'class':'wear'});d.appendChild(iconEl(x[0],'e'));d.appendChild(el('div',{'class':'t'},x[1]));wr.appendChild(d);}
+    wr.appendChild(el('div',{'class':'weargrp'},'Tonight'));pjs(wx.night).forEach(chip);
+    wr.appendChild(el('div',{'class':'weargrp'},'Tomorrow'));o.wear.forEach(chip);
   }
   function feelWord(t){
     if(t>=35)return 'very hot';if(t>=28)return 'hot';if(t>=22)return 'warm';if(t>=17)return 'mild';
@@ -4896,10 +4939,10 @@
   function wxFreshNow(){return wx&&wx.date===today()&&Date.now()-(wx.at||0)<45*60000&&wxLocOK();}
   function speakWx(){
     keepAwake();
-    if(wxFreshNow()){say(weatherSpeech());return;}
+    if(wxFreshNow()){say(isEvening()?eveningSpeech():weatherSpeech());return;}
     // old or missing forecast (e.g. the tablet was on overnight): fetch first, then speak
     fetchWx().then(function(ok){
-      if(ok||(wx&&wx.date===today()))say(weatherSpeech());
+      if(ok||(wx&&wx.date===today()))say(isEvening()?eveningSpeech():weatherSpeech());
       else say(navigator.onLine===false?'I need the internet to check the weather. Ask a grown-up to check the wifi.':'The weather is taking a break right now. Try again soon!');
     });
   }
@@ -4912,7 +4955,7 @@
     var L=wxLoc();if(!L){renderWx();return Promise.resolve(false);}
     var url='https://api.open-meteo.com/v1/forecast?latitude='+L.lat+'&longitude='+L.lon+
       '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weather_code,wind_speed_10m_max,wind_gusts_10m_max'+
-      '&hourly=uv_index,weather_code,precipitation_probability,precipitation&timezone=auto&forecast_days=2';
+      '&hourly=uv_index,weather_code,precipitation_probability,precipitation,temperature_2m&timezone=auto&forecast_days=2';
     wxBusy=new Promise(function(done){
     try{
       fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(j){
@@ -4942,6 +4985,19 @@
           else wx.code=cnt.sun>=cnt.part&&cnt.sun>=cnt.cloud?0:(cnt.part>=cnt.cloud?2:3);
         }
         if(dayRain>=0)wx.rain=dayRain;
+        // tonight (8pm–6am) and tomorrow, for the evening card
+        if(d.temperature_2m_max&&d.temperature_2m_max.length>1){
+          var tmr=ymd(addDays(today0(),1)),low=null,tRain=-1,tc={sun:0,part:0,cloud:0,rain:0,storm:0,snow:0};
+          (h.time||[]).forEach(function(t,i){var hr=+t.slice(11,13),dd=t.slice(0,10),tp=(h.temperature_2m||[])[i];
+            if(tp!=null&&((dd===td&&hr>=20)||(dd===tmr&&hr<=6)))low=low==null?tp:Math.min(low,tp);
+            if(dd===tmr&&hr>=7&&hr<=18){var pp=(h.precipitation_probability||[])[i],c=(h.weather_code||[])[i];if(pp!=null)tRain=Math.max(tRain,pp);
+              if(c!=null){if(c===0)tc.sun++;else if(c<=2)tc.part++;else if(c===3||c===45||c===48)tc.cloud++;else if(c>=95)tc.storm++;else if((c>=71&&c<=77)||c===85||c===86)tc.snow++;else tc.rain++;}}});
+          var tcode=tc.storm>=2?95:tc.snow>=2?71:tc.rain>=5?61:tc.rain>=2?80:(tc.sun+tc.part+tc.cloud?(tc.sun>=tc.part&&tc.sun>=tc.cloud?0:(tc.part>=tc.cloud?2:3)):d.weather_code[1]);
+          wx.night=low!=null?low:d.temperature_2m_min[1];
+          wx.tm={date:tmr,max:d.temperature_2m_max[1],min:d.temperature_2m_min[1],uv:(d.uv_index_max&&d.uv_index_max[1])||0,
+            rain:tRain>=0?tRain:((d.precipitation_probability_max&&d.precipitation_probability_max[1])||0),code:tcode,
+            wind:(d.wind_speed_10m_max&&d.wind_speed_10m_max[1])||0,gust:(d.wind_gusts_10m_max&&d.wind_gusts_10m_max[1])||0};
+        }
         // rain by part of the day: before lunch, after lunch, tonight
         wx.rp=RAIN_PARTS.map(function(pt){var o={p:-1,mm:0};
           (h.time||[]).forEach(function(t,i){if(t.slice(0,10)!==td)return;var hr=+t.slice(11,13);if(hr<pt[1]||hr>=pt[2])return;
