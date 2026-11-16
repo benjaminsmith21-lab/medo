@@ -390,7 +390,7 @@ test('praise describes what they did, changes each time, and fades as the habit 
   t.close();
   // a child with a month of history: some ticks are just a quiet "You brushed your teeth."
   const h={};for(let i=1;i<=30;i++){const d=ymd(new Date(Date.now()-i*864e5));h[d]={kA:{am:['teeth'],pm:[],done:['teeth']}};}
-  const t2=boot({storage:{qb_hist:h,qb_tips:{'undo:kA':1}}});await wait(300);
+  const t2=boot({cfg:c=>{c.trophies=false;},storage:{qb_hist:h,qb_tips:{'undo:kA':1}}});   // no badge news in the wayawait wait(300);
   t2.w.Math.random=()=>0.99;   // above the fade line
   t2.d.querySelectorAll('.kcard')[0].click();
   t2.d.querySelector('.tile:not(.done)').click();await wait(150);
