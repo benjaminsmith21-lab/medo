@@ -112,8 +112,11 @@ test('public holidays follow the country; a new US device gets °F and US holida
 });
 
 test('first run shows the setup; an existing family does not',async()=>{
-  let t=boot({blank:true});await wait(5000);   // after the splash (about 4 seconds)
-  assert.ok(t.d.getElementById('setupOv').classList.contains('show'));t.close();
+  let t=boot({blank:true});await wait(3000);
+  assert.ok(t.d.getElementById('intro'),'the splash waits for them');
+  t.button('Get started',t.d.getElementById('intro')).click();await wait(400);
+  assert.ok(t.d.getElementById('setupOv').classList.contains('show'));
+  assert.match(t.d.getElementById('setupOv').textContent,/Who's using it/,'straight to the first question');t.close();
   t=boot();await wait(4000);
   assert.ok(!t.d.getElementById('setupOv').classList.contains('show'));t.close();
 });
@@ -328,12 +331,12 @@ test('the money jar is spoken in words, and an empty jar says so',async()=>{
 });
 
 test('first-run setup assumes nothing: no default children, town or leave time',async()=>{
-  const t=boot({blank:true});await wait(5000);
+  const t=boot({blank:true});await wait(3000);
+  t.button('Get started',t.d.getElementById('intro')).click();await wait(400);
   assert.ok(!t.fetches.some(u=>/api\.open-meteo\.com\/v1\/forecast/.test(u)),'no weather lookup before a town is chosen');
   assert.equal(t.d.getElementById('wx').style.display,'none');
   const ov=t.d.getElementById('setupOv');
   assert.ok(!t.button('Skip setup',ov),'no skip-everything button');
-  t.button("Let's start",ov).click();
   assert.equal(ov.querySelectorAll('.sukid').length,1,'one child to start');
   const nm=ov.querySelector('.bigname');assert.equal(nm.value,'');
   t.button('Next',ov).click();assert.ok(ov.querySelector('.bigname'),'needs a name before moving on');

@@ -549,6 +549,9 @@
   #intro{animation:inFail .3s 7s forwards;position:fixed;inset:0;z-index:200;background:#1b1f3b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;overflow:hidden;cursor:pointer}
   #intro.out{animation:inOut .45s ease-in forwards}
   @keyframes inFail{to{opacity:0;visibility:hidden}}   /* safety net: never block the board */
+  #intro.first{animation:none;cursor:default}
+  .in-go{margin-top:10px;font-size:24px;padding:16px 40px;opacity:0;animation:inPop .5s ease-out both}
+  .in-note{font-size:15px;color:#8a90c8;opacity:0;animation:inPop .5s ease-out 1.9s both;text-align:center;padding:0 24px}
   @keyframes inOut{to{opacity:0;transform:scale(1.08)}}
   .in-logo{width:min(300px,60vw);height:auto;animation:inDrop .75s cubic-bezier(.3,1.5,.5,1) both}
   @keyframes inDrop{0%{transform:translateY(-70vh) rotate(-25deg) scale(.6)}60%{transform:translateY(0) rotate(4deg) scale(1.08,.9)}80%{transform:scale(.96,1.05) rotate(-2deg)}100%{transform:none}}
@@ -559,7 +562,7 @@
   @keyframes inPop{0%{opacity:0;transform:translateY(30px) scale(.3)}100%{opacity:1;transform:none}}
   .in-hi{font-size:clamp(24px,4.2vw,40px);font-weight:800;color:#fff;opacity:0;animation:inPop .5s ease-out both;text-align:center;padding:0 24px;max-width:900px;line-height:1.2}
   .in-sub{font-size:clamp(16px,2.4vw,22px);font-weight:600;color:#c9cdf5;opacity:0;animation:inPop .5s ease-out both;text-align:center;padding:0 28px;max-width:720px;line-height:1.45}
-  @media (prefers-reduced-motion:reduce){.in-logo,.in-kid,.in-hi,.in-sub{animation:none;opacity:1}.in-spark{display:none}}
+  @media (prefers-reduced-motion:reduce){.in-logo,.in-kid,.in-hi,.in-sub,.in-go,.in-note{animation:none;opacity:1}.in-spark{display:none}}
 
   .storycard{text-align:center}
   .storylogo{width:min(200px,50vw);height:auto;margin:4px auto 6px;display:block}
@@ -734,7 +737,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · consistent fields';
+  var BOARD_VERSION='16 Nov 2026 · get started';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1889,8 +1892,9 @@
   }
   // ---- first-run setup ----
   var setupStep=0,setupNames=null;
-  function openSetup(){
-    setupStep=0;
+  var setupFrom=0;
+  function openSetup(from){
+    setupStep=setupFrom=from||0;
     var defNames=['','Big Kid','Little Kid'];
     setupNames=cfg.kids.filter(function(kd){return defNames.indexOf(kd.name)<0;}).map(function(kd){return {id:kd.id,name:kd.name,emoji:kd.emoji,birthday:kd.birthday||''};});
     if(!setupNames.length)setupNames=[{id:cfg.kids[0].id,name:'',emoji:cfg.kids[0].emoji,birthday:''}];
@@ -1918,7 +1922,7 @@
   function drawSetup(){
     var ov=document.getElementById('setupOv');ov.innerHTML='';
     var box=el('div',{'class':'subox'});ov.appendChild(box);
-    var N=5,dots=el('div',{'class':'sudots'});for(var i=0;i<N;i++)dots.appendChild(el('span',{'class':i===setupStep?'on':i<setupStep?'done':''}));
+    var N=5-setupFrom,cur=setupStep-setupFrom,dots=el('div',{'class':'sudots'});for(var i=0;i<N;i++)dots.appendChild(el('span',{'class':i===cur?'on':i<cur?'done':''}));
     var body=el('div',{'class':'subody'}),nav=el('div',{'class':'sunav'});
     function next(){setupStep++;drawSetup();}
     function back(){setupStep--;drawSetup();}
@@ -1952,7 +1956,7 @@
         var used=setupNames.map(function(x){return x.emoji;});setupNames.push({id:null,name:'',emoji:AVATARS.filter(function(a){return used.indexOf(a)<0;})[0]||'⭐'});drawSetup();});body.appendChild(add);}
       var kn=sBtn('Next','primary',function(){if(!okKids())return;applyKids();next();});
       var okKids=function(){var ok=setupNames.every(function(r){return r.name.trim();});kn.classList.toggle('dim',!ok);return ok;};
-      nav.appendChild(sBtn('Back','',back));nav.appendChild(kn);okKids();
+      if(setupFrom<1)nav.appendChild(sBtn('Back','',back));else nav.appendChild(el('span'));nav.appendChild(kn);okKids();
     }
     else if(setupStep===2){
       body.appendChild(el('h2',null,'Where do you live?'));
@@ -4760,7 +4764,7 @@
 
 
   // ================= Intro: a short animated hello after the system splash (tap to skip) =================
-  var introDone=false,introWaiters=[];
+  var introDone=false,introWaiters=[],introSetup=false;
   function afterIntro(fn){if(introDone)fn();else introWaiters.push(fn);}
   function endIntro(){
     if(introDone)return;introDone=true;var o=document.getElementById('intro');
@@ -4781,6 +4785,14 @@
     hi.style.animationDelay='0.85s';o.appendChild(hi);
     var sub=el('div',{'class':'in-sub'},'Medo gives kids a simple tool for your family\'s morning, afternoon and bedtime routines, and the pride of doing it themselves.');
     sub.style.animationDelay='1.25s';o.appendChild(sub);
+    if(firstRun&&!cfg.setupDone){
+      // first time: stay here until they choose to start, then go straight to the questions (no second welcome)
+      introSetup=true;o.classList.add('first');
+      var go=el('button',{'class':'btn primary big in-go'},'Get started');go.style.animationDelay='1.7s';
+      go.addEventListener('click',function(e){e.stopPropagation();endIntro();setTimeout(function(){openSetup(1);},200);});
+      o.appendChild(go);o.appendChild(el('div',{'class':'in-note'},'A few quick questions so the board is ready for your kids.'));
+      return;
+    }
     o.addEventListener('click',endIntro);
     setTimeout(endIntro,4200);   // long enough to read; a tap skips it
   })();
@@ -4788,7 +4800,7 @@
   renderWx();
   fetchWx();
   setTimeout(statsStart,3000);
-  if(firstRun&&!cfg.setupDone)afterIntro(function(){setTimeout(openSetup,250);});
+  if(firstRun&&!cfg.setupDone&&!introSetup)afterIntro(function(){setTimeout(openSetup,250);});
   // Offline support + install as an app
   var swReg=null;
   try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){swReg=r;}).catch(function(){});}catch(e){}
