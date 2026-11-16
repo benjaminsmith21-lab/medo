@@ -545,3 +545,10 @@ test('number fields use the app\'s number pad; search uses the app-styled search
   key('2');key('1');t.button('Done',sh).click();
   assert.equal(inp.value,'21');assert.equal(nb.textContent,'21');t.close();
 });
+
+test('splash: a set-up family gets a hello by name, not the new-device pitch',async()=>{
+  const t=boot();await wait(1200);
+  const o=t.d.getElementById('intro');
+  if(o){assert.doesNotMatch(o.textContent,/shouldn't be a battle|Get started/);assert.match(o.textContent,/Good (morning|afternoon|evening), Ava & Leo!/);}
+  t.close();
+});

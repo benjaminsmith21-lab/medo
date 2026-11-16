@@ -737,7 +737,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · get started';
+  var BOARD_VERSION='16 Nov 2026 · two splashes';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -4781,20 +4781,30 @@
       sp.style.setProperty('--dx',Math.round(Math.cos(a)*190)+'px');sp.style.setProperty('--dy',Math.round(Math.sin(a)*150)+'px');sp.style.setProperty('--r',(i%2?40:-40)+'deg');
       sp.style.animationDelay=(0.55+i*0.03)+'s';o.appendChild(sp);
     });
-    var hi=el('div',{'class':'in-hi'},'Getting out the door or ready for bed shouldn\'t be a battle.');
-    hi.style.animationDelay='0.85s';o.appendChild(hi);
-    var sub=el('div',{'class':'in-sub'},'Medo gives kids a simple tool for your family\'s morning, afternoon and bedtime routines, and the pride of doing it themselves.');
-    sub.style.animationDelay='1.25s';o.appendChild(sub);
-    if(firstRun&&!cfg.setupDone){
-      // first time: stay here until they choose to start, then go straight to the questions (no second welcome)
+    var named=cfg.kids.filter(function(x){return (x.name||'').trim();});
+    if((firstRun&&!cfg.setupDone)||!named.length){   // (older boards never set setupDone, so don't rely on it alone)
+      // new device (or no children yet): what Medo is, and a button to set it up
+      var hi=el('div',{'class':'in-hi'},'Getting out the door or ready for bed shouldn\'t be a battle.');
+      hi.style.animationDelay='0.85s';o.appendChild(hi);
+      var sub=el('div',{'class':'in-sub'},'Medo gives kids a simple tool for your family\'s morning, afternoon and bedtime routines, and the pride of doing it themselves.');
+      sub.style.animationDelay='1.25s';o.appendChild(sub);
       introSetup=true;o.classList.add('first');
       var go=el('button',{'class':'btn primary big in-go'},'Get started');go.style.animationDelay='1.7s';
       go.addEventListener('click',function(e){e.stopPropagation();endIntro();setTimeout(function(){openSetup(1);},200);});
       o.appendChild(go);o.appendChild(el('div',{'class':'in-note'},'A few quick questions so the board is ready for your kids.'));
       return;
     }
+    // a family that's set up: their pictures pop in, then a hello by name
+    var kids=el('div',{'class':'in-kids'});
+    named.slice(0,6).forEach(function(kd,i){var k=el('span',{'class':'in-kid'},kd.emoji);k.style.animationDelay=(0.8+i*0.14)+'s';kids.appendChild(k);});
+    o.appendChild(kids);
+    var h=new Date().getHours(),part=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+    var names=named.map(function(x){return x.name.trim();}),who=names.length>3?'everyone':names.length>1?names.slice(0,-1).join(', ')+' & '+names[names.length-1]:names[0];
+    var bk=-1;try{bk=birthdayKid(currentTheme());}catch(e){}
+    var hey=el('div',{'class':'in-hi'},bk>-1?'🎂 Happy birthday, '+cfg.kids[bk].name+'!':part+', '+who+'!');
+    hey.style.animationDelay=(0.85+named.length*0.14)+'s';o.appendChild(hey);
     o.addEventListener('click',endIntro);
-    setTimeout(endIntro,4200);   // long enough to read; a tap skips it
+    setTimeout(endIntro,1500+named.length*140+400);
   })();
   render();
   renderWx();
