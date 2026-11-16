@@ -531,3 +531,14 @@ test('lifting the finger after a hold does not tap the Done button underneath',a
   await wait(600);done.click();
   assert.ok(!t.d.getElementById('settings').classList.contains('open'),'a real tap on Done still works');t.close();
 });
+
+test('number fields use the app\'s number pad; search uses the app-styled search box',async()=>{
+  const t=boot();await wait(300);t.openSettings('Events');await wait(200);
+  const S=t.d.getElementById('settings');
+  const nb=S.querySelector('.numbtn');assert.ok(nb,'number shown as a button');
+  const inp=nb.previousSibling;nb.click();
+  const sh=t.d.querySelector('.pksheet');assert.ok(!sh.querySelector('input'),'no device keyboard');
+  const key=k=>[...sh.querySelectorAll('.keypad button')].find(b=>b.textContent===k).click();
+  key('2');key('1');t.button('Done',sh).click();
+  assert.equal(inp.value,'21');assert.equal(nb.textContent,'21');t.close();
+});
