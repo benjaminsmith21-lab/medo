@@ -551,6 +551,10 @@
   @keyframes inFail{to{opacity:0;visibility:hidden}}   /* safety net: never block the board */
   #intro.first{animation:none;cursor:default}
   .in-go{margin-top:10px;font-size:24px;padding:16px 40px;opacity:0;animation:inPop .5s ease-out both}
+  .suvoices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 6px}
+  .suvoice{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:18px;font-weight:800;cursor:pointer}
+  .suvoice.on{border-color:#ffd23f;background:#3d3a7a}.suvplay{width:34px;height:34px;border-radius:50%;background:#ffd23f;color:#1b1f3b;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+  @media (max-width:560px){.suvoices{grid-template-columns:1fr 1fr}}
   .suprivi{font-size:54px;text-align:center}
   .suprivlist{display:flex;flex-direction:column;gap:12px;margin:6px 0 14px}.suprivrow{display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.45;color:#e6e8ff}.suprivic{font-size:24px;flex:none;width:32px;text-align:center}
   #sampOv{position:fixed;inset:0;z-index:400;background:#1b1f3b;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -742,7 +746,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · voice sample maker';
+  var BOARD_VERSION='16 Nov 2026 · pick a voice';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1141,7 +1145,9 @@
     deviceSay(text,cb,tok);
   }
   // start fetching the natural voice after the first tap, so it is ready for the next one
-  document.addEventListener('pointerdown',function first(){document.removeEventListener('pointerdown',first);if(cfg.ai&&cfg.ai.on)aiLoad();},{once:true});
+  document.addEventListener('pointerdown',function first(){document.removeEventListener('pointerdown',first);
+    if(firstRun&&!cfg.setupDone)return;   // new device: wait until they've picked a voice in setup
+    if(cfg.ai&&cfg.ai.on)aiLoad();},{once:true});
   function deviceSay(text,done,tok){
     if(tok!=null&&tok!==speechTicket)return;
     if(!window.speechSynthesis){if(done)done();return;}
@@ -1908,7 +1914,7 @@
     document.getElementById('setupOv').classList.add('show');drawSetup();
   }
   var setupLeave='';
-  function closeSetup(done){stats(done?'setup-done':'setup-skipped',nKids()+' kids');document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();render();renderWx();fetchWx();}
+  function closeSetup(done){stats(done?'setup-done':'setup-skipped',nKids()+' kids');document.getElementById('setupOv').classList.remove('show');cfg.setupDone=true;sv();try{if(cfg.ai&&cfg.ai.on)aiLoad();}catch(e){}render();renderWx();fetchWx();}
   function applyKids(){
     // update, add or remove children to match the setup list
     setupNames.forEach(function(r,i){
@@ -1995,8 +2001,24 @@
       body.appendChild(el('p',{'class':'susub'},'Medo talks to '+kidList()+': it cheers each job, says what to wear and tells the time. Turn the volume up and test it.'));
       var names=cfg.kids.map(function(x){return x.name;});
       var hi='Hi '+(names.length>1?names.slice(0,-1).join(', ')+' and '+names[names.length-1]:names[0])+'! Can you hear me? Let\'s do our jobs!';
-      var tb=sBtn('🔊 Test the voice','primary big',function(){var v=cfg.voice;cfg.voice=true;say(hi);cfg.voice=v;});body.appendChild(tb);
-      body.appendChild(el('p',{'class':'susub'},'You can choose a different voice, or turn it off, in Settings → Sound.'));
+      // pick a voice: each card plays a short recorded sample straight away, then that voice downloads in the background
+      body.appendChild(el('div',{'class':'emocat'},'Pick the voice you like:'));
+      var vg=el('div',{'class':'suvoices'}),sAud=null;
+      KOKORO_VOICES.forEach(function(v){
+        var nm=v[1].replace(/ \(.*$/,''),c=el('button',{'class':'suvoice'+(cfg.ai.voice===v[0]?' on':'')});
+        c.appendChild(el('span',{'class':'suvplay'},'▶'));c.appendChild(el('span',null,nm));
+        c.addEventListener('click',function(){
+          stopSpeaking();if(sAud){try{sAud.pause();}catch(e){}}
+          sAud=new Audio('tts/samples/'+nm.toLowerCase()+'.mp3');try{var pr=sAud.play();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}
+          cfg.ai.on=true;cfg.ai.voice=v[0];sv();
+          [].forEach.call(vg.children,function(b){b.classList.toggle('on',b===c);});
+        });
+        vg.appendChild(c);
+      });
+      body.appendChild(vg);
+      body.appendChild(el('p',{'class':'susub'},'Your voice downloads in the background (about 115 MB, best on wifi). Until it\'s ready, the '+devWord()+'\'s own voice fills in.'));
+      var tb=sBtn('🔊 Test the sound now','',function(){var v=cfg.voice;cfg.voice=true;say(hi);cfg.voice=v;});body.appendChild(tb);
+      body.appendChild(el('p',{'class':'susub'},'You can change the voice, or turn it off, in Settings → Sound.'));
       nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',next));
     }
     else{

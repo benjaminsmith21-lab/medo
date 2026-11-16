@@ -347,6 +347,9 @@ test('first-run setup assumes nothing: no default children, town or leave time',
   t.button('Next',ov).click();assert.ok(ov.querySelector('.sutimes'),'needs a time or "no set time"');
   t.button('8:30',ov).click();t.button('Next',ov).click();
   assert.match(ov.textContent,/talks to Mia/);assert.ok(!ov.querySelector('.switch'),'no voice off switch in setup');
+  t.button('Emma',ov).click();
+  assert.ok(t.played.some(x=>/tts\/samples\/emma\.mp3$/.test(x)),'plays the sample straight away');
+  assert.equal(t.cfg().ai.voice,'k:bf_emma');
   t.button('Next',ov).click();
   assert.match(ov.textContent,/stays on this/);
   const c=t.cfg();assert.equal(c.kids.length,1);assert.equal(c.kids[0].name,'Mia');assert.equal(c.days[1].leave,'08:30');assert.equal(c.loc.lat,null);
