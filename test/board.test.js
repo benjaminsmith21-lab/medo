@@ -567,3 +567,17 @@ test('Delete everything erases Medo from the device',async()=>{
   const b=t.button('Delete everything',S);b.click();b.click();await wait(300);
   assert.ok(!Object.keys(t.w.localStorage).some(k=>/^qb_cfg|^qb_hist/.test(k)),'saved settings gone');t.close();
 });
+
+test('town search suggests places as you type, nearest country first, and Enter picks the top one',async()=>{
+  const geo={results:[{name:'Frankston',admin1:'Texas',country:'United States',country_code:'US',latitude:32.05,longitude:-95.5},
+                      {name:'Frankston',admin1:'Victoria',country:'Australia',country_code:'AU',latitude:-38.14,longitude:145.12}]};
+  const t=boot({fetch:u=>/geocoding-api/.test(u)?{ok:true,json:()=>Promise.resolve(geo)}:null});await wait(300);
+  t.openSettings('Weather');await wait(100);
+  const S=t.d.getElementById('settings'),q=S.querySelector('.placesearch input');
+  assert.ok(!t.button('Search',S.querySelector('.placesearch')),'no Search button');
+  q.value='Fran';q.dispatchEvent(new t.w.Event('input'));await wait(600);
+  const opts=[...S.querySelectorAll('.locopt')].map(b=>b.textContent);
+  assert.match(opts[0],/Frankston.*Victoria/,'Australia first');
+  q.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Enter'}));await wait(100);
+  assert.equal(t.cfg().loc.lat,-38.14);t.close();
+});

@@ -551,6 +551,10 @@
   @keyframes inFail{to{opacity:0;visibility:hidden}}   /* safety net: never block the board */
   #intro.first{animation:none;cursor:default}
   .in-go{margin-top:10px;font-size:24px;padding:16px 40px;opacity:0;animation:inPop .5s ease-out both}
+  .placesearch{display:flex;flex-direction:column;gap:8px;width:100%;align-self:stretch}
+  .locresults{display:flex;flex-direction:column;gap:6px}
+  .locopt{width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 16px;border-radius:14px;border:none;background:#2f3670;color:#fff;font:inherit;cursor:pointer}
+  .locopt b{font-size:18px}.locopt span{font-size:14px;color:#aab3e6}.locopt:active{transform:scale(.98)}
   .suvoices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 6px}
   .suvoice{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:18px;font-weight:800;cursor:pointer}
   .suvoice.on{border-color:#ffd23f;background:#3d3a7a}.suvplay{width:34px;height:34px;border-radius:50%;background:#ffd23f;color:#1b1f3b;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
@@ -746,7 +750,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · pick a voice';
+  var BOARD_VERSION='16 Nov 2026 · town suggestions as you type';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -3495,30 +3499,41 @@
 
   // ---------- Weather ----------
   // Town search (Open-Meteo geocoding). Calls onPick({name,lat,lon}).
+  // town search: suggestions appear as you type (no Search button to press)
   function placeSearch(placeholder,onPick){
-    var wrap=el('div'),row=el('div',{'class':'row'});
-    var q=el('input',{type:'text',placeholder:placeholder,style:'flex:1;min-width:180px'});
-    var results=el('div',{'class':'locresults'});
-    function doSearch(){
-      var term=q.value.trim();if(term.length<2)return;
-      results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Searching…'));
+    var wrap=el('div',{'class':'placesearch'}),sb=searchBox(placeholder,''),q=sb.input;
+    q.setAttribute('autocomplete','off');q.setAttribute('autocapitalize','words');q.setAttribute('enterkeyhint','search');
+    var results=el('div',{'class':'locresults'}),timer=null,seq=0,cache={},last=[];
+    function show(list,term){
+      results.innerHTML='';last=list;
+      if(!list.length){results.appendChild(el('p',{'class':'hint'},'No places found for "'+term+'". Try a nearby bigger town.'));return;}
+      list.forEach(function(p){
+        var b=el('button',{'class':'locopt',type:'button'});
+        b.appendChild(el('b',null,p.name));var sub=[p.admin1,p.country].filter(Boolean).join(', ');if(sub)b.appendChild(el('span',null,sub));
+        b.addEventListener('click',function(){pick(p);});results.appendChild(b);
+      });
+    }
+    function pick(p){results.innerHTML='';last=[];q.value='';sb.box.classList.remove('has');
+      onPick({name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude,cc:p.country_code||'',admin1:p.admin1||''});}
+    function lookup(term){
+      var key=term.toLowerCase();if(cache[key]){show(cache[key],term);return;}
+      var my=++seq;
       try{
-        fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name='+encodeURIComponent(term)).then(function(r){return r.json();}).then(function(j){
-          results.innerHTML='';var list=(j&&j.results)||[];
-          if(!list.length){results.appendChild(el('p',{'class':'hint'},'No places found. Try a nearby bigger town.'));return;}
-          var pref=(cfg.holidays&&cfg.holidays.country)||localeRegion()||'AU';
+        fetch('https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name='+encodeURIComponent(term)).then(function(r){return r.json();}).then(function(j){
+          if(my!==seq)return;   // an older search finished after a newer one: ignore it
+          var list=(j&&j.results)||[],pref=(cfg.holidays&&cfg.holidays.country)||localeRegion()||'AU';
           list.sort(function(a,b){return (b.country_code===pref)-(a.country_code===pref);});
-          list.forEach(function(p){
-            results.appendChild(sBtn(p.name+(p.admin1?', '+p.admin1:'')+(p.country?', '+p.country:''),'locbtn',function(){
-              results.innerHTML='';q.value='';onPick({name:p.name+(p.admin1?', '+p.admin1:''),lat:p.latitude,lon:p.longitude,cc:p.country_code||'',admin1:p.admin1||''});
-            }));
-          });
-        }).catch(function(){results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t search right now. Check the internet connection.'));});
+          list=list.slice(0,6);cache[key]=list;show(list,term);
+        }).catch(function(){if(my!==seq)return;results.innerHTML='';results.appendChild(el('p',{'class':'hint'},'Couldn\'t search right now. Check the internet connection.'));});
       }catch(e){}
     }
-    q.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
-    row.appendChild(q);row.appendChild(sBtn('Search','primary',doSearch));
-    wrap.appendChild(row);wrap.appendChild(results);
+    q.addEventListener('input',function(){
+      clearTimeout(timer);var term=q.value.trim();
+      if(term.length<2){seq++;results.innerHTML='';last=[];return;}
+      timer=setTimeout(function(){lookup(term);},300);
+    });
+    q.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(last.length)pick(last[0]);else{clearTimeout(timer);var t=q.value.trim();if(t.length>=2)lookup(t);}}});
+    wrap.appendChild(sb.box);wrap.appendChild(results);
     return wrap;
   }
   var AU_STATES={'Victoria':'VIC','New South Wales':'NSW','Queensland':'QLD','South Australia':'SA','Western Australia':'WA','Tasmania':'TAS','Northern Territory':'NT','Australian Capital Territory':'ACT'};
