@@ -551,6 +551,8 @@
   @keyframes inFail{to{opacity:0;visibility:hidden}}   /* safety net: never block the board */
   #intro.first{animation:none;cursor:default}
   .in-go{margin-top:10px;font-size:24px;padding:16px 40px;opacity:0;animation:inPop .5s ease-out both}
+  .suprivi{font-size:54px;text-align:center}
+  .suprivlist{display:flex;flex-direction:column;gap:12px;margin:6px 0 14px}.suprivrow{display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.45;color:#e6e8ff}.suprivic{font-size:24px;flex:none;width:32px;text-align:center}
   .in-note{font-size:15px;color:#8a90c8;opacity:0;animation:inPop .5s ease-out 1.9s both;text-align:center;padding:0 24px}
   @keyframes inOut{to{opacity:0;transform:scale(1.08)}}
   .in-logo{width:min(300px,60vw);height:auto;animation:inDrop .75s cubic-bezier(.3,1.5,.5,1) both}
@@ -737,7 +739,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · two splashes';
+  var BOARD_VERSION='16 Nov 2026 · setup wording and privacy';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -866,7 +868,8 @@
     try{var b=localStorage.getItem(key+'_backup');if(b)return JSON.parse(b);}catch(e){}  // fall back to the backup copy
     return fallback;
   }
-  function save(key,val){
+  var erasing=false;
+  function save(key,val){if(erasing)return;
     try{var j=JSON.stringify(val);localStorage.setItem(key,j);if(key==='qb_cfg'){localStorage.setItem(key+'_backup',j);localStorage.setItem('qb_saved_at',String(Date.now()));}}catch(e){}
   }
   // Ask the browser to treat this board's data as important so it isn't cleared to free up space
@@ -1919,10 +1922,11 @@
     }
     view=-1;normalize();ensureProg();sv();
   }
+  function kidList(){var n=cfg.kids.map(function(x){return (x.name||'').trim();}).filter(Boolean);return n.length?(n.length>1?n.slice(0,-1).join(', ')+' and '+n[n.length-1]:n[0]):'your kids';}
   function drawSetup(){
     var ov=document.getElementById('setupOv');ov.innerHTML='';
     var box=el('div',{'class':'subox'});ov.appendChild(box);
-    var N=5-setupFrom,cur=setupStep-setupFrom,dots=el('div',{'class':'sudots'});for(var i=0;i<N;i++)dots.appendChild(el('span',{'class':i===cur?'on':i<cur?'done':''}));
+    var N=6-setupFrom,cur=setupStep-setupFrom,dots=el('div',{'class':'sudots'});for(var i=0;i<N;i++)dots.appendChild(el('span',{'class':i===cur?'on':i<cur?'done':''}));
     var body=el('div',{'class':'subody'}),nav=el('div',{'class':'sunav'});
     function next(){setupStep++;drawSetup();}
     function back(){setupStep--;drawSetup();}
@@ -1944,7 +1948,7 @@
         var grid=el('div',{'class':'avgrid sugrid'});grid.style.display='none';
         AVATARS.forEach(function(a){var b=el('button',{'class':a===r.emoji?'sel':''},a);b.addEventListener('click',function(){r.emoji=a;av.textContent=a;grid.style.display='none';});grid.appendChild(b);});
         av.addEventListener('click',function(){grid.style.display=grid.style.display==='none'?'':'none';});
-        var nm=el('input',{type:'text','class':'bigname',value:r.name,maxlength:'16',placeholder:i?'Next child\'s name':'Your child\'s name'});
+        var nm=el('input',{type:'text','class':'bigname',value:r.name,maxlength:'16',placeholder:i?'Next child\'s first name':'Your child\'s first name'});
         nm.addEventListener('input',function(){r.name=nm.value;okKids();});
         var bdi=el('input',{type:'date',value:r.birthday||'',max:today(),title:'Birthday (optional)','class':'subday'});
         bdi.addEventListener('change',function(){r.birthday=bdi.value;});
@@ -1959,17 +1963,17 @@
       if(setupFrom<1)nav.appendChild(sBtn('Back','',back));else nav.appendChild(el('span'));nav.appendChild(kn);okKids();
     }
     else if(setupStep===2){
-      body.appendChild(el('h2',null,'Where do you live?'));
-      body.appendChild(el('p',{'class':'susub'},'For "What should I wear?" and sunscreen reminders.'));
+      body.appendChild(el('h2',null,'What town do you live in?'));
+      body.appendChild(el('p',{'class':'susub'},'Medo will show '+kidList()+' what to wear each day, and whether sun protection is needed, based on the weather and UV where you are.'));
       var cur=el('p',{'class':'sucur'},hasHome()?'📍 '+cfg.loc.name+' ✓':'');body.appendChild(cur);
       var ln=sBtn('Next','primary',function(){if(hasHome())next();});ln.classList.toggle('dim',!hasHome());
       body.appendChild(placeSearch('Type your town or suburb',function(pl){setHome(pl);cur.textContent='📍 '+pl.name+' ✓';ln.classList.remove('dim');}));
-      var nw=el('button',{'class':'suskip',style:'align-self:flex-start'},'Skip, I don\'t need the weather');nw.addEventListener('click',next);body.appendChild(nw);
+      var nw=el('button',{'class':'suskip',style:'align-self:flex-start'},'Skip, we don\'t need what-to-wear tips');nw.addEventListener('click',next);body.appendChild(nw);
       nav.appendChild(sBtn('Back','',back));nav.appendChild(ln);
     }
     else if(setupStep===3){
       body.appendChild(el('h2',null,'What time do you leave on school days?'));
-      body.appendChild(el('p',{'class':'susub'},'A little runner counts down on the board so the kids can see how long is left. Monday to Friday; change single days later.'));
+      body.appendChild(el('p',{'class':'susub'},'A little runner counts down on the board so '+kidList()+' can see how long is left. You can fine-tune this in Settings later.'));
       var chips=el('div',{'class':'chips sutimes'});
       var ti=el('input',{type:'time',value:setupLeave});
       var tn=sBtn('Next','primary',function(){if(!setupLeave)return;for(var d=1;d<=5;d++)cfg.days[d].leave=setupLeave;sv();next();});
@@ -1983,14 +1987,27 @@
       none.addEventListener('click',function(){for(var d=1;d<=5;d++)cfg.days[d].leave='';sv();next();});body.appendChild(none);
       nav.appendChild(sBtn('Back','',back));nav.appendChild(tn);mark();
     }
-    else{
+    else if(setupStep===4){
       body.appendChild(el('h2',null,'Can you hear me?'));
-      body.appendChild(el('p',{'class':'susub'},'The board talks: it praises each job, reads the weather and tells the time. Turn the volume up and test it.'));
+      body.appendChild(el('p',{'class':'susub'},'Medo talks to '+kidList()+': it cheers each job, says what to wear and tells the time. Turn the volume up and test it.'));
       var names=cfg.kids.map(function(x){return x.name;});
       var hi='Hi '+(names.length>1?names.slice(0,-1).join(', ')+' and '+names[names.length-1]:names[0])+'! Can you hear me? Let\'s do our jobs!';
       var tb=sBtn('🔊 Test the voice','primary big',function(){var v=cfg.voice;cfg.voice=true;say(hi);cfg.voice=v;});body.appendChild(tb);
-      body.appendChild(sField('Voice on','',[sSwitch(cfg.voice!==false,function(v){cfg.voice=v;sv();})]));
-      body.appendChild(el('p',{'class':'susub'},'A more natural voice downloads in the background. Until then the '+devWord()+'\'s own voice is used.'));
+      body.appendChild(el('p',{'class':'susub'},'You can choose a different voice, or turn it off, in Settings → Sound.'));
+      nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Next','primary',next));
+    }
+    else{
+      // last page: their family's information stays theirs
+      body.appendChild(el('div',{'class':'suprivi'},'🔒'));
+      body.appendChild(el('h2',null,'Your family\'s information stays on this '+devWord()));
+      var pl=el('div',{'class':'suprivlist'});
+      [['📱','Everything you add, like names, birthdays, photos and messages, is saved only on this '+devWord()+'.'],
+       ['🙅','No accounts, no ads, and nothing to sign up for. We never see your children\'s details.'],
+       ['🌦️','To show the weather, Medo asks a weather service about your town. Nothing about your children is sent.'],
+       ['🗑️','It\'s yours to keep or delete. Back it up or erase everything any time in Settings → This '+devWord()+'.']
+      ].forEach(function(x){var r=el('div',{'class':'suprivrow'});r.appendChild(el('span',{'class':'suprivic'},x[0]));r.appendChild(el('span',null,x[1]));pl.appendChild(r);});
+      body.appendChild(pl);
+      body.appendChild(sField('Share anonymous usage counts','Helps us improve Medo, like how many boards are used each day. Never names, photos or anything personal.',[sSwitch(statsOn(),function(v){try{localStorage.setItem('qb_stats',v?'on':'off');}catch(e){}if(v)statsStart();})]));
       nav.appendChild(sBtn('Back','',back));nav.appendChild(sBtn('Let\'s go! 🎉','primary',function(){closeSetup(true);confetti(0,['🎉','⭐','✨','🎊']);}));
     }
     box.appendChild(dots);box.appendChild(body);box.appendChild(nav);
@@ -2573,6 +2590,12 @@
     inp.addEventListener('input',function(){box.classList.toggle('has',!!inp.value);});
     x.addEventListener('click',function(){inp.value='';box.classList.remove('has');inp.dispatchEvent(new Event('input'));inp.focus();});
     return {box:box,input:inp};
+  }
+  function eraseAll(){
+    erasing=true;   // nothing may be saved again before the reload
+    try{Object.keys(localStorage).forEach(function(k){if(/^qb_/.test(k))localStorage.removeItem(k);});}catch(e){}
+    var go=function(){try{sessionStorage.clear();}catch(e){}location.reload();};
+    try{var rq=indexedDB.deleteDatabase('qb_photos');rq.onsuccess=rq.onerror=rq.onblocked=go;setTimeout(go,1500);}catch(e){go();}
   }
   function sBtn(text,cls,fn){var b=el('button',{'class':'btn'+(cls?' '+cls:'')},text);b.addEventListener('click',fn);return b;}
   function sConfirm(text,confirmText,cls,fn){var armed=false,b=el('button',{'class':cls||'linkbtn'},text);
@@ -4046,6 +4069,7 @@
     rc.appendChild(sField('Clear today\'s ticks','Unticks everything for today. Stars and reading days stay.',[sConfirm('Clear','Tap again to clear','btn',function(){prog=null;ensureProg();renderSettings();})]));
     rc.appendChild(sField('Clear progress history','Clears Progress and reward counts. Stars and reading stay.',[sConfirm('Clear history','Tap again to clear','btn danger',function(){hist={};save('qb_hist',hist);recordToday();renderSettings();})]));
     rc.appendChild(sField('Restore the default quests','Replaces quests and the week plan. Children and stars stay.',[sConfirm('Restore','Tap again to restore','btn danger',function(){var names=cfg.kids;cfg=defaults();cfg.kids=names;normalize();sv();renderSettings();})]));
+    rc.appendChild(sField('Delete everything','Erases all of Medo\'s information from this '+devWord()+': children, quests, stars, history, photos and messages. It can\'t be undone.',[sConfirm('Delete everything','Tap again to erase it all','btn danger',eraseAll)]));
     inner.appendChild(rc);
     var uc=sCard('Updates','Updates install by themselves.');
     var ust=el('span',{'class':'muted'},updateReady?'New version ready: '+updateReady:'Version: '+BOARD_VERSION);
@@ -4791,7 +4815,7 @@
       introSetup=true;o.classList.add('first');
       var go=el('button',{'class':'btn primary big in-go'},'Get started');go.style.animationDelay='1.7s';
       go.addEventListener('click',function(e){e.stopPropagation();endIntro();setTimeout(function(){openSetup(1);},200);});
-      o.appendChild(go);o.appendChild(el('div',{'class':'in-note'},'A few quick questions so the board is ready for your kids.'));
+      o.appendChild(go);
       return;
     }
     // a family that's set up: their pictures pop in, then a hello by name

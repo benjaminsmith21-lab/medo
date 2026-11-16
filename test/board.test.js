@@ -341,11 +341,14 @@ test('first-run setup assumes nothing: no default children, town or leave time',
   const nm=ov.querySelector('.bigname');assert.equal(nm.value,'');
   t.button('Next',ov).click();assert.ok(ov.querySelector('.bigname'),'needs a name before moving on');
   nm.value='Mia';nm.dispatchEvent(new t.w.Event('input'));t.button('Next',ov).click();
-  assert.doesNotMatch(ov.textContent,/Frankston/);
-  t.button("Skip, I don't need the weather",ov).click();
+  assert.doesNotMatch(ov.textContent,/Frankston/);assert.match(ov.textContent,/Medo will show Mia what to wear/);
+  t.button("Skip, we don't need what-to-wear tips",ov).click();
   assert.ok(!ov.querySelector('.sutimes .chip.on'),'no leave time picked for them');
   t.button('Next',ov).click();assert.ok(ov.querySelector('.sutimes'),'needs a time or "no set time"');
   t.button('8:30',ov).click();t.button('Next',ov).click();
+  assert.match(ov.textContent,/talks to Mia/);assert.ok(!ov.querySelector('.switch'),'no voice off switch in setup');
+  t.button('Next',ov).click();
+  assert.match(ov.textContent,/stays on this/);
   const c=t.cfg();assert.equal(c.kids.length,1);assert.equal(c.kids[0].name,'Mia');assert.equal(c.days[1].leave,'08:30');assert.equal(c.loc.lat,null);
   t.close();
 });
@@ -551,4 +554,13 @@ test('splash: a set-up family gets a hello by name, not the new-device pitch',as
   const o=t.d.getElementById('intro');
   if(o){assert.doesNotMatch(o.textContent,/shouldn't be a battle|Get started/);assert.match(o.textContent,/Good (morning|afternoon|evening), Ava & Leo!/);}
   t.close();
+});
+
+test('Delete everything erases Medo from the device',async()=>{
+  const t=boot({idb:true});await wait(300);
+  await t.putAudio('msg|zz','data:audio/webm;base64,AAAA');
+  t.openSettings('This device');
+  const S=t.d.getElementById('settings');
+  const b=t.button('Delete everything',S);b.click();b.click();await wait(300);
+  assert.ok(!Object.keys(t.w.localStorage).some(k=>/^qb_cfg|^qb_hist/.test(k)),'saved settings gone');t.close();
 });
