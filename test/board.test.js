@@ -380,19 +380,21 @@ test('cool but sunny: the sun warning explains itself',async()=>{
   t.close();
 });
 
-test('praise after a quest mostly uses the child\'s name',async()=>{
-  const t=boot();await wait(300);
-  const kd=t.cfg().kids[0];
+test('praise describes what they did, changes each time, and fades as the habit forms',async()=>{
+  // a brand-new child (no history): praise on every tick, worded differently each time
+  const t=boot({storage:{qb_hist:{}}});await wait(300);
   t.d.querySelectorAll('.kcard')[0].click();
-  let named=0;
-  for(let i=0;i<3;i++){
-    const tile=t.d.querySelector('.tile:not(.done)');tile.click();await wait(150);
-    if(t.lastSaid().includes(kd.name))named++;
-    tile.click();await wait(150); // untick to try again
-  }
-  t.w.Math.random=()=>0.1;
-  t.d.querySelector('.tile:not(.done)').click();await wait(150);
-  assert.match(t.lastSaid(),new RegExp(', '+kd.name+'!$'));t.close();
+  const said=[];
+  for(let i=0;i<4;i++){const tile=t.d.querySelector('.tile:not(.done)');tile.click();await wait(120);said.push(t.lastSaid());tile.click();await wait(120);}
+  assert.ok(new Set(said).size>=3,'varied: '+said.join(' | '));
+  t.close();
+  // a child with a month of history: some ticks are just a quiet "You brushed your teeth."
+  const h={};for(let i=1;i<=30;i++){const d=ymd(new Date(Date.now()-i*864e5));h[d]={kA:{am:['teeth'],pm:[],done:['teeth']}};}
+  const t2=boot({storage:{qb_hist:h,qb_tips:{'undo:kA':1}}});await wait(300);
+  t2.w.Math.random=()=>0.99;   // above the fade line
+  t2.d.querySelectorAll('.kcard')[0].click();
+  t2.d.querySelector('.tile:not(.done)').click();await wait(150);
+  assert.match(t2.lastSaid(),/^You [^.!]+\.$/,'a plain description, no praise word');t2.close();
 });
 
 test('spoken countdown: says the time left and asks about each child\'s next quest',async()=>{
@@ -580,4 +582,23 @@ test('town search suggests places as you type, nearest country first, and Enter 
   assert.match(opts[0],/Frankston.*Victoria/,'Australia first');
   q.dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Enter'}));await wait(100);
   assert.equal(t.cfg().loc.lat,-38.14);t.close();
+});
+
+test('finishing asks how they feel, with words for their age, and remembers the answer',async()=>{
+  const bday=new Date();bday.setFullYear(bday.getFullYear()-4);bday.setMonth(0,1);
+  const t=boot({cfg:c=>{c.arvoStart='23:59';c.kids[0].birthday=ymd(bday);c.kids[0].stars={count:0,last:''};}});await wait(300);
+  t.d.querySelectorAll('.kcard')[0].click();
+  while(t.d.querySelector('.tile:not(.done)'))t.d.querySelector('.tile:not(.done)').click();
+  await wait(600);
+  const ov=t.d.getElementById('feelOv');assert.ok(ov,'check-in shown');
+  assert.match(ov.textContent,/Happy/);assert.match(ov.textContent,/Grumpy/);assert.doesNotMatch(ov.textContent,/Tricky/,'little-kid words for a 4-year-old');
+  [...ov.querySelectorAll('.feelbtn')].find(b=>b.textContent.includes('Happy')).click();await wait(200);
+  const h=JSON.parse(t.w.localStorage.getItem('qb_hist'));assert.equal(h[ymd(new Date())].kA.feel.am,'good');t.close();
+});
+
+test('new rewards start as a surprise and are announced as one',async()=>{
+  const t=boot();await wait(300);t.openSettings('Rewards');
+  t.button('+ New reward',t.d.getElementById('settings')).click();
+  const r=t.cfg().rewards.slice(-1)[0];assert.equal(r.show,false);
+  assert.match(t.d.getElementById('settings').textContent,/Surprise/);t.close();
 });

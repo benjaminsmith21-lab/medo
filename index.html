@@ -555,6 +555,14 @@
   .locresults{display:flex;flex-direction:column;gap:6px}
   .locopt{width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 16px;border-radius:14px;border:none;background:#2f3670;color:#fff;font:inherit;cursor:pointer}
   .locopt b{font-size:18px}.locopt span{font-size:14px;color:#aab3e6}.locopt:active{transform:scale(.98)}
+  #feelOv{position:fixed;inset:0;z-index:135;background:rgba(8,10,30,.7);display:flex;align-items:center;justify-content:center;padding:20px}
+  .feelbox{background:#232858;border-radius:28px;padding:24px 28px;max-width:640px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:pkPop .25s ease-out}
+  .feelkid{font-size:56px}.feelq{font-size:clamp(22px,3.4vw,32px);font-weight:800;color:#fff;margin:6px 0 18px}
+  .feelrow{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .feelbtn{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:130px;padding:16px 10px;border-radius:22px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:20px;font-weight:800;cursor:pointer}
+  .feelbtn:active{transform:scale(.96);border-color:#ffd23f}.feelem{font-size:62px;line-height:1}
+  .feelreply{font-size:22px;font-weight:800;color:#ffd23f;padding:10px}
+  .feeltrend{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:6px 0 10px;font-size:20px}.feeltrend .muted{font-size:14px;margin-right:6px}.feelday{min-width:22px;text-align:center}
   .suvoices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 6px}
   .suvoice{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:18px;font-weight:800;cursor:pointer}
   .suvoice.on{border-color:#ffd23f;background:#3d3a7a}.suvplay{width:34px;height:34px;border-radius:50%;background:#ffd23f;color:#1b1f3b;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
@@ -750,7 +758,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · town suggestions as you type';
+  var BOARD_VERSION='16 Nov 2026 · own-motivation update';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1299,6 +1307,8 @@
       var prev=day[kd.id]||{},nowM=new Date().getHours()*60+new Date().getMinutes();
       if(prev.t0!=null)rec.t0=prev.t0;else if(rec.done.length===1&&!(prev.done&&prev.done.length))rec.t0=nowM;
       if(recStats(rec).amAll){if(prev.amAt!=null)rec.amAt=prev.amAt;else if(rec.t0!=null&&prev.am&&!recStats(prev).amAll)rec.amAt=nowM;}
+      if(prev.feel)rec.feel=prev.feel;
+      if(rec.amAt!=null){var lm=leaveMinToday();if(prev.early!=null)rec.early=prev.early;else if(lm!=null)rec.early=lm-rec.amAt;}
       var j=JSON.stringify(rec);if(JSON.stringify(day[kd.id])!==j){day[kd.id]=rec;changed=true;}
     }
     // the day's weather and any special day (for Sun Smart, Rain Ranger and the secret badges)
@@ -2149,11 +2159,12 @@
         if(rc%50===0){milestone=rc;lines.push(pastPhrase(s)+'! Wow! '+kd.name+', that is '+rc+' days of reading! That is amazing!');}
         else lines.push(pastPhrase(s)+'! That is '+rc+(rc===1?' day':' days')+' of reading. Great job!');
       }
-      else if(left>0){lines.push(praiseLine(s,kd));}
+      else if(left>0){lines.push(praiseOrNote(s,kd,per));}
       else lines.push(pastPhrase(s)+'!');
       if(left===0){
         big=true;
         lines.push('Hooray '+kd.name+'! All done'+(per==='pm'?' for the afternoon':' for the morning')+'!');
+        if(per==='am'&&!prog.celebrated.am[k]){var el_=earlyLine(k);if(el_)lines.push(el_);}
         prog.celebrated[per][k]=true;
       }
       // star jar: everything done for the whole day
@@ -2166,7 +2177,8 @@
       save('qb_cfg',cfg);
       recordToday();
       var newRw=rewardsFor(k).filter(function(x){return x.p.earned&&rwBefore.indexOf(x.rw.id)<0;})[0];
-      if(newRw)lines.push(newRw.rw.kind==='money'?'And you earned '+moneySay(newRw.rw.amount)+' for your money jar! Tell a grown-up!':'And you earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');
+      if(newRw){var sp=newRw.rw.show===false?freshPick(kd,'s',['Surprise! ','Guess what? Surprise! ','Here\'s a surprise! ','Oh! A surprise! ']):'And ';
+        lines.push(newRw.rw.kind==='money'?sp+'You earned '+moneySay(newRw.rw.amount)+' for your money jar! Tell a grown-up!':sp+'You earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');}
       var newB=trophOn()?updTrophies(k).news:[];
       if(newB.length)lines.push('You won a new badge: '+newsTitle(newB[0])+'!'+(newB.length>1?' And '+(newB.length-1)+' more!':'')+' Look in your trophy case.');
       if(newRw&&!milestone){bigFanfare();confetti(k,['🎁','🎉','⭐','🏆','✨']);showBanner(newRw.rw.kind==='money'?'💰':(newRw.rw.emoji||'🎁'),kd.name+' earned: '+rwPrize(newRw.rw)+'!');}
@@ -2179,11 +2191,90 @@
       else blip();
       if(!tipSeen('undo:'+kidId(k))){markTip('undo:'+kidId(k));lines.push('Oops, wrong one? Hold your finger on it to undo.');}
       var vm=msgAfterTick(k,left===0?per:'',star,s.id);
-      say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)]);}:null);
+      var ask=big?function(){feelCheck(k,per);}:null;
+      say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)],ask);}:ask);
       if(big&&!isSplit()){clearTimeout(idleT);idleT=setTimeout(goHome,milestone||star?8000:6000);}
     }
     save('qb_prog',prog);
     render();
+  }
+  // ===== Own-motivation features: praise that describes (and fades), feelings check-in, "ready early", surprise rewards =====
+  function ageBand(kd){var a=kidAge(kd);return a!=null&&a<=5?'young':'older';}   // unknown age: wording that suits 6+ but is still simple
+  var recentLines={};   // per child: last few lines used, so nothing repeats too soon
+  function freshPick(kd,key,list){
+    var used=recentLines[kd.id+key]||(recentLines[kd.id+key]=[]);
+    var pool=list.filter(function(x){return used.indexOf(x)<0;});if(!pool.length){used.length=0;pool=list;}
+    var p=pool[Math.floor(Math.random()*pool.length)];used.push(p);if(used.length>Math.min(6,list.length-1))used.shift();return p;
+  }
+  function fillN(t,kd,per){return t.replace(/\{n\}/g,kd.name).replace(/\{part\}/g,per==='pm'?'afternoon':'morning');}
+  var PRAISE_D={
+    young:['You did it all by yourself!','Your own hands did that!','You remembered!','You knew just what to do!','No help needed!','You did it, {n}!',
+      'All by yourself, {n}!','That was you! You did that!','You did it without anyone asking!','Look what you did!','You can do it, and you did!','Big job, done by you!',
+      '{n} did it!','You remembered all on your own!','You did that one so carefully!'],
+    older:['You remembered that without a reminder.','That was all your own work.','You knew exactly what to do.','Nobody had to ask you. You just did it.',
+      'You\'re getting really good at this.','You did that all on your own, {n}.','You\'re getting yourself ready, just like that.','No help needed for that one.',
+      'You\'re in charge of your {part}.','You kept going, {n}. Nice.','Another one done by you.','You\'re really getting the hang of this.',
+      'That\'s you looking after yourself.','You didn\'t even need the picture for that one, did you?','Steady and sure, {n}. That\'s how it\'s done.']
+  };
+  function daysUsed(kd){var n=0;for(var d in hist){var r=hist[d]&&hist[d][kd.id];if(r&&r.done&&r.done.length)n++;}return n;}
+  // praise every quest at first, then less often as the habit forms; quiet ticks still say what they did
+  function praiseOrNote(s,kd,per){
+    var d=daysUsed(kd),chance=d<7?1:d<21?0.7:0.45;
+    if(Math.random()>chance)return pastPhrase(s)+'.';
+    var r=Math.random();
+    if(d<7&&r<0.2)return praiseLine(s,kd);   // the cheerful old style, now and then in the first week
+    var line=fillN(freshPick(kd,'p',PRAISE_D[ageBand(kd)]),kd,per);
+    return r<0.55?pastPhrase(s)+'. '+line:line;
+  }
+  // ---- ready early: compared with themselves, never with anyone else ----
+  function leaveMinToday(){var l=cfg.days[new Date().getDay()]&&cfg.days[new Date().getDay()].leave;if(!l)return null;var p=l.split(':');return +p[0]*60+(+p[1]);}
+  function earlyLine(k){
+    var kd=cfg.kids[k],lm=leaveMinToday();if(lm==null)return '';
+    var now=new Date().getHours()*60+new Date().getMinutes(),early=lm-now;if(early<=0||early>90)return '';
+    if(ageBand(kd)==='young')return freshPick(kd,'e',['You were ready before the runner got to the car!','You beat the runner to the car!',
+      'The runner isn\'t even at the car yet, and you\'re ready!','Ready before the runner! Wow!']);
+    var past=[];Object.keys(hist).sort().reverse().forEach(function(d){if(d===today()||past.length>=7)return;var r=hist[d][kd.id];if(r&&r.early!=null)past.push(r.early);});
+    if(past.length>=3){var avg=Math.round(past.reduce(function(a,b){return a+b;},0)/past.length),diff=early-avg;
+      if(diff>=2)return freshPick(kd,'e',['You were ready '+early+' minutes before leaving. That\'s '+diff+' minutes earlier than usual!',
+        'Ready with '+early+' minutes to spare, '+diff+' minutes sooner than usual!','That\'s your quickest in a while: '+diff+' minutes earlier than usual!']);}
+    if(Math.random()<0.5)return '';   // not every day, so it stays special
+    return freshPick(kd,'e',['You were ready '+early+' minutes before it was time to go.',early+' minutes to spare. You did that!','Ready with time to spare!']);
+  }
+  // ---- how do you feel? (after finishing a routine) ----
+  var FEEL={
+    young:{q:['How do you feel?','How are you feeling now?','How did your {part} go?'],
+      opts:[['good','😊','Happy'],['ok','😐','Okay'],['low','😣','Grumpy']],
+      good:['Yay! You feel happy. You did that!','A happy {part}! You made it happy.','Happy is a great feeling. It\'s all yours!','Happy! Give yourself a big hug.'],
+      ok:['Okay is fine. Thanks for telling me.','Some days are just okay. You still did it!','Okay is okay! You did your jobs.'],
+      low:['Thanks for telling me. Grumpy feelings happen. You still did your jobs!','It\'s okay to feel grumpy. Maybe a big hug will help.','Grumpy days happen to everyone. You still did it!']},
+    older:{q:['How do you feel about your {part}?','How was your {part}?','How are you feeling about getting ready today?'],
+      opts:[['good','😄','Proud'],['ok','🙂','Okay'],['low','😕','Tricky']],
+      good:['You feel proud. That feeling is all yours.','Proud is a great feeling, and you earned it yourself.','Remember this feeling. You made it happen.','You should feel proud. You did that.'],
+      ok:['Okay is fine. Not every {part} has to be amazing.','Thanks for telling me. You still got yourself ready.','Okay is a perfectly good way to feel.'],
+      low:['Thanks for telling me. Tricky {part}s happen to everyone.','That sounds tricky. You still got it done, and that matters.','Tricky days happen. You can tell a grown-up about it if you like.']}
+  };
+  function setFeel(k,per,v){
+    var t=today(),kd=cfg.kids[k];if(!hist[t]||!hist[t][kd.id])recordToday();
+    var r=hist[t]&&hist[t][kd.id];if(!r)return;r.feel=r.feel||{};r.feel[per]=v;save('qb_hist',hist);
+  }
+  function feelCheck(k,per){
+    if(cfg.feelings===false)return;
+    var kd=cfg.kids[k],band=FEEL[ageBand(kd)],old=document.getElementById('feelOv');if(old)old.remove();
+    var ov=el('div',{id:'feelOv'}),box=el('div',{'class':'feelbox'});
+    box.appendChild(el('div',{'class':'feelkid'},kd.emoji));
+    var q=fillN(freshPick(kd,'q',band.q),kd,per);
+    box.appendChild(el('div',{'class':'feelq'},q));
+    var row=el('div',{'class':'feelrow'}),closeT=setTimeout(function(){ov.remove();},25000);
+    band.opts.forEach(function(o){
+      var b=el('button',{'class':'feelbtn'});b.appendChild(el('span',{'class':'feelem'},o[1]));b.appendChild(el('span',null,o[2]));
+      b.addEventListener('click',function(){clearTimeout(closeT);setFeel(k,per,o[0]);stats('feeling',o[0]);
+        var reply=fillN(freshPick(kd,'f'+o[0],band[o[0]]),kd,per);
+        row.innerHTML='';row.appendChild(el('div',{'class':'feelreply'},o[1]+' '+reply));
+        say(reply,function(){setTimeout(function(){ov.remove();},1200);});setTimeout(function(){ov.remove();},9000);});
+      row.appendChild(b);
+    });
+    box.appendChild(row);ov.appendChild(box);document.body.appendChild(ov);
+    say(kd.name+', '+q.charAt(0).toLowerCase()+q.slice(1));
   }
   function showBanner(bigText,small){
     var o=el('div',{'class':'mile'}),mb=el('div',{'class':'mile-big'});if(typeof bigText==='string')mb.textContent=bigText;else mb.appendChild(bigText);o.appendChild(mb);o.appendChild(el('div',{'class':'mile-small'},small));
@@ -3334,7 +3425,8 @@
       b.appendChild(sField('Counting',{since:'Resets when given.',week:'Resets each Monday.',row:'A missed day resets it.'}[rw.frame||'since'],
         [sSeg([['since','Over time'],['week','In one week'],['row','In a row']],rw.frame||'since',function(v){rw.frame=v;redraw();})]));
       b.appendChild(sField('Repeats',null,[sSeg([['every','Every time'],['once','Just once']],rw.repeat||'every',function(v){rw.repeat=v;redraw();})]));
-      b.appendChild(sField('Show progress on their card','Shows 🎁 3/5 on their card.',[sSwitch(rw.show!==false,function(v){rw.show=v;sv();})]));
+      b.appendChild(sField('How they see it','',[sSeg([['surprise','🤫 Surprise'],['count','🎁 Counting up']],rw.show===false?'surprise':'count',function(v){rw.show=v==='count';sv();renderSettings();})]));
+      b.appendChild(el('p',{'class':'hint'},rw.show===false?'It stays a secret until it\'s earned, then it\'s a surprise. Rewards children don\'t expect keep the focus on doing it themselves.':'Shows 🎁 3/5 on their card as it counts up.'));
       rwKids(rw).forEach(function(id){
         var kd=kidOf(id);if(!kd)return;var pr=rwProgress(rw,id);
         var bar=el('div',{'class':'pbar'});var fill=el('div',{'class':'pfill'});fill.style.width=Math.round(pr.count/pr.n*100)+'%';bar.appendChild(fill);
@@ -3350,7 +3442,7 @@
     });
     if(!cfg.rewards.length)lc.appendChild(el('p',{'class':'muted'},'No rewards yet.'));
     var adds=el('div',{'class':'row',style:'margin-top:10px'});
-    adds.appendChild(sBtn('+ New reward','primary',function(){var r={id:'r'+Date.now(),emoji:'🎁',prize:'',kids:[],type:'quest',quest:'teeth',n:10,frame:'since',repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();}));
+    adds.appendChild(sBtn('+ New reward','primary',function(){var r={id:'r'+Date.now(),emoji:'🎁',prize:'',kids:[],type:'quest',quest:'teeth',n:10,frame:'since',repeat:'every',show:false,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();}));
     lc.appendChild(adds);
     lc.appendChild(el('div',{'class':'emocat',style:'margin-top:16px'},'Or start from an idea'));
     var ideas=el('div',{'class':'rwideas'});
@@ -3358,7 +3450,7 @@
      ['🏞️','Trip to the park','stars',10,'since','','Earn 10 stars'],['📕','A new book','reading',20,'since','','Read on 20 days'],
      ['🦷','Sticker','quest',7,'row','teeth','Brush teeth 7 days in a row'],['🎬','Movie night','mornings',5,'week','','Finish mornings 5 days in a week']].forEach(function(x){
       var c=el('button',{'class':'rwidea'});c.appendChild(el('span',{'class':'rwie'},x[0]));var t=el('span',{'class':'rwit'});t.appendChild(el('b',null,x[1]));t.appendChild(el('span',null,x[6]));c.appendChild(t);
-      c.addEventListener('click',function(){var r={id:'r'+Date.now(),emoji:x[0],prize:x[7]?'':x[1],kind:x[7]?'money':'',amount:x[7]||0,kids:[],type:x[2],quest:x[5]||'',n:x[3],frame:x[4],repeat:'every',show:true,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();render();});
+      c.addEventListener('click',function(){var r={id:'r'+Date.now(),emoji:x[0],prize:x[7]?'':x[1],kind:x[7]?'money':'',amount:x[7]||0,kids:[],type:x[2],quest:x[5]||'',n:x[3],frame:x[4],repeat:'every',show:false,created:today()};cfg.rewards.push(r);openReward=r.id;sv();renderSettings();render();});
       ideas.appendChild(c);
     });
     lc.appendChild(ideas);
@@ -3431,12 +3523,21 @@
     inner.appendChild(sSeg([['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days']],String(sRange),function(v){sRange=+v;renderSettings();}));
     inner.appendChild(el('div',{style:'height:12px'}));
     proofCard(inner);
+    var fc=sCard('💬 How they feel');
+    fc.appendChild(sField('Ask how they feel when they finish','Happy, okay or grumpy for little ones; proud, okay or tricky for older kids.',[sSwitch(cfg.feelings!==false,function(v){cfg.feelings=v;sv();renderSettings();})]));
+    inner.appendChild(fc);
     var keys=Object.keys(hist).sort();
     var t=today0(),from=addDays(t,-(sRange-1));
     cfg.kids.forEach(function(kd,k){
       var c=sCard();kidColour(c,k);
       var hd=el('div',{'class':'phead'});hd.appendChild(el('span',{'class':'pav'},kd.emoji));hd.appendChild(el('span',{'class':'pname'},kd.name));c.appendChild(hd);
       routineInsight(kd).forEach(function(n){c.appendChild(n);});
+      // how they felt, last 14 days (morning, then afternoon)
+      var FE={young:{good:'😊',ok:'😐',low:'😣'},older:{good:'😄',ok:'🙂',low:'😕'}}[ageBand(kd)],fr=[],nf=0;
+      for(var fx=addDays(today0(),-13);fx<=today0();fx=addDays(fx,1)){var fr_=histRec(ymd(fx),kd.id),fl=fr_&&fr_.feel;
+        var cell=el('span',{'class':'feelday',title:fmtDate(ymd(fx))});
+        cell.textContent=fl?(FE[fl.am]||'')+(FE[fl.pm]||''):'·';if(fl)nf++;fr.push(cell);}
+      if(nf){var frw=el('div',{'class':'feeltrend'});frw.appendChild(el('span',{'class':'muted'},'Feelings, last 2 weeks: '));fr.forEach(function(x){frw.appendChild(x);});c.appendChild(frw);}
       var tot=0,dn=0,full=0,stars=0,reads=0,days=0,amT=0,amD=0,pmT=0,pmD=0,per={};
       for(var x=new Date(from);x<=t;x=addDays(x,1)){
         var r=histRec(ymd(x),kd.id);if(!r)continue;var st=recStats(r);if(!st.total)continue;
