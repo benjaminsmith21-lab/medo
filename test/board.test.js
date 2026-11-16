@@ -584,16 +584,29 @@ test('town search suggests places as you type, nearest country first, and Enter 
   assert.equal(t.cfg().loc.lat,-38.14);t.close();
 });
 
-test('finishing asks how they feel, with words for their age, and remembers the answer',async()=>{
+test('finishing sometimes asks how they feel, in words for their age; grumpy leaves a note for grown-ups',async()=>{
   const bday=new Date();bday.setFullYear(bday.getFullYear()-4);bday.setMonth(0,1);
-  const t=boot({cfg:c=>{c.arvoStart='23:59';c.kids[0].birthday=ymd(bday);c.kids[0].stars={count:0,last:''};}});await wait(300);
+  const t=boot({cfg:c=>{c.arvoStart='23:59';c.kids[0].birthday=ymd(bday);c.kids[0].stars={count:0,last:''};c.lock={type:'maths'};},storage:{qb_tips:{'undo:kA':1}}});await wait(300);
+  t.w.Math.random=()=>0.1;   // this time it asks
   t.d.querySelectorAll('.kcard')[0].click();
   while(t.d.querySelector('.tile:not(.done)'))t.d.querySelector('.tile:not(.done)').click();
   await wait(600);
   const ov=t.d.getElementById('feelOv');assert.ok(ov,'check-in shown');
   assert.match(ov.textContent,/Happy/);assert.match(ov.textContent,/Grumpy/);assert.doesNotMatch(ov.textContent,/Tricky/,'little-kid words for a 4-year-old');
-  [...ov.querySelectorAll('.feelbtn')].find(b=>b.textContent.includes('Happy')).click();await wait(200);
-  const h=JSON.parse(t.w.localStorage.getItem('qb_hist'));assert.equal(h[ymd(new Date())].kA.feel.am,'good');t.close();
+  [...ov.querySelectorAll('.feelbtn')].find(b=>b.textContent.includes('Grumpy')).click();await wait(200);
+  assert.doesNotMatch(t.lastSaid(),/great|better|best/i,'no feeling is ranked above another');
+  const h=JSON.parse(t.w.localStorage.getItem('qb_hist'));assert.equal(h[ymd(new Date())].kA.feel.am,'low');
+  assert.ok(t.d.getElementById('gearBtn').classList.contains('hasnote'),'a dot on the gear');
+  t.openSettings();
+  const S=t.d.getElementById('settings');assert.match(S.textContent,/Ava said the morning felt grumpy/);
+  assert.match(S.textContent,/You could ask/);assert.doesNotMatch(S.textContent,/\b(he|she|his|her|son|daughter)\b/,'no gender assumed');
+  t.button('We talked',S).click();assert.ok(!t.d.getElementById('gearBtn').classList.contains('hasnote'));t.close();
+});
+
+test('the home screen does not put the children\'s scores side by side',async()=>{
+  const t=boot();await wait(300);
+  const card=t.d.querySelector('.kcard');
+  assert.doesNotMatch(card.querySelector('.kbadges').textContent,/⭐|📚|\d/);t.close();
 });
 
 test('new rewards start as a surprise and are announced as one',async()=>{

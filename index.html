@@ -563,6 +563,9 @@
   .feelbtn:active{transform:scale(.96);border-color:#ffd23f}.feelem{font-size:62px;line-height:1}
   .feelreply{font-size:22px;font-weight:800;color:#ffd23f;padding:10px}
   .feeltrend{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:6px 0 10px;font-size:20px}.feeltrend .muted{font-size:14px;margin-right:6px}.feelday{min-width:22px;text-align:center}
+  #gearBtn.hasnote::before{content:attr(data-n);position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#ff5a7a;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #1b1f3b}
+  .navcount{margin-left:auto;background:#ff5a7a;color:#fff;border-radius:10px;padding:1px 8px;font-size:13px;font-weight:800}
+  .notehead{font-weight:800;font-size:18px;margin-bottom:6px}.noteqs{margin:4px 0 12px 18px;line-height:1.7;color:#e6e8ff}
   .suvoices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 6px}
   .suvoice{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;border:3px solid transparent;background:#2f3670;color:#fff;font:inherit;font-size:18px;font-weight:800;cursor:pointer}
   .suvoice.on{border-color:#ffd23f;background:#3d3a7a}.suvplay{width:34px;height:34px;border-radius:50%;background:#ffd23f;color:#1b1f3b;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
@@ -758,7 +761,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · own-motivation update';
+  var BOARD_VERSION='16 Nov 2026 · psychologist tweaks';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1224,7 +1227,7 @@
     var count=steps.filter(function(s){return done.indexOf(s.id)>-1;}).length;
     var complete=steps.length&&count===steps.length;
     var c=el('button',{'class':'kcard'+(complete?' complete':'')});kidColour(c,k);
-    c.appendChild(badges(k,'kbadges'));
+    c.appendChild(badges(k,'kbadges',true));
     var ring=el('div',{'class':'ring'});
     ring.style.background='conic-gradient(var(--c) '+(steps.length?count/steps.length*360:0)+'deg, #0e1130 0deg)';
     ring.appendChild(el('div',{'class':'ring-inner'},kid.emoji));
@@ -1242,19 +1245,19 @@
     c.addEventListener('click',function(){openKid(k);});
     return c;
   }
-  function badges(k,cls){
+  function badges(k,cls,home){   // home: no counts side by side (it invites comparing); each child sees their own on their screen
     var kd=cfg.kids[k],b=el('div',{'class':cls});
-    b.appendChild(el('span',{'class':'pill',title:'Stars in the star jar'},'⭐ '+(kd.stars.count||0)));
-    if(hasReading(k))b.appendChild(el('span',{'class':'pill',title:'Days of reading'},'📚 '+(kd.reads.count||0)));
+    if(!home)b.appendChild(el('span',{'class':'pill',title:'Stars in the star jar'},'⭐ '+(kd.stars.count||0)));
+    if(!home&&hasReading(k))b.appendChild(el('span',{'class':'pill',title:'Days of reading'},'📚 '+(kd.reads.count||0)));
     var rws=rewardsFor(k).filter(function(x){return x.rw.show!==false&&!x.p.finished&&!x.p.weekClaimed;});
     var earned=rws.filter(function(x){return x.p.earned;})[0];
     function tapSay(node,text){node.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();keepAwake();say(text);});return node;}
     if(earned)b.appendChild(tapSay(el('span',{'class':'pill reward earned',title:rwPrize(earned.rw)},'🎁 Reward!'),'You earned '+rwPrize(earned.rw)+'! Ask a grown-up for it.'));
-    else if(rws.length){rws.sort(function(a,b){return (b.p.count/b.p.n)-(a.p.count/a.p.n);});var r0=rws[0],left=r0.p.n-r0.p.count;
+    else if(rws.length&&!home){rws.sort(function(a,b){return (b.p.count/b.p.n)-(a.p.count/a.p.n);});var r0=rws[0],left=r0.p.n-r0.p.count;
       b.appendChild(tapSay(el('span',{'class':'pill reward',title:rwPrize(r0.rw)},(r0.rw.kind==='money'?'💰':(r0.rw.emoji||'🎁'))+' '+r0.p.count+'/'+r0.p.n),
         'You have done '+r0.p.count+' out of '+r0.p.n+'. '+left+' more for '+rwPrize(r0.rw)+'!'));}
     if(trophOn()){
-      var tp=el('span',{'class':'pill troph'+(trophUnseen(k)?' new':''),title:'Trophy case'},'🏆 '+trophCount(k));
+      var tp=el('span',{'class':'pill troph'+(trophUnseen(k)?' new':''),title:'Trophy case'},home?'🏆':'🏆 '+trophCount(k));
       tp.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();openTrophies(k);});
       b.appendChild(tp);
     }
@@ -2207,15 +2210,17 @@
     var p=pool[Math.floor(Math.random()*pool.length)];used.push(p);if(used.length>Math.min(6,list.length-1))used.shift();return p;
   }
   function fillN(t,kd,per){return t.replace(/\{n\}/g,kd.name).replace(/\{part\}/g,per==='pm'?'afternoon':'morning');}
+  // only things that are always true: the app can't see whether a grown-up reminded them, or how carefully it was done
   var PRAISE_D={
-    young:['You did it all by yourself!','Your own hands did that!','You remembered!','You knew just what to do!','No help needed!','You did it, {n}!',
-      'All by yourself, {n}!','That was you! You did that!','You did it without anyone asking!','Look what you did!','You can do it, and you did!','Big job, done by you!',
-      '{n} did it!','You remembered all on your own!','You did that one so carefully!'],
-    older:['You remembered that without a reminder.','That was all your own work.','You knew exactly what to do.','Nobody had to ask you. You just did it.',
-      'You\'re getting really good at this.','You did that all on your own, {n}.','You\'re getting yourself ready, just like that.','No help needed for that one.',
-      'You\'re in charge of your {part}.','You kept going, {n}. Nice.','Another one done by you.','You\'re really getting the hang of this.',
-      'That\'s you looking after yourself.','You didn\'t even need the picture for that one, did you?','Steady and sure, {n}. That\'s how it\'s done.']
+    young:['You did it!','Another one done!','Tick! That one\'s done!','Look at you go!','That\'s you getting ready!','Done, {n}!',
+      'One more job done by you!','You\'re doing it, {n}!','You\'re on your way!','Your list is getting shorter!','Off you go to the next one!',
+      'Yes! That one\'s finished!','You ticked it, {n}!','Getting ready, one job at a time!','Ding! Done!'],
+    older:['You ticked that one off yourself.','That\'s another one done.','You\'re getting yourself ready.','Your list is getting shorter, {n}.',
+      'You\'re in charge of your {part}.','One more off the list.','You kept going, {n}.','That\'s you looking after yourself.',
+      'Another step done.','Steady progress, {n}.','You\'re moving through your list.','Nice and steady.','You\'re getting the hang of this.',
+      'That\'s one less thing to think about.','On to the next one, {n}.']
   };
+
   function daysUsed(kd){var n=0;for(var d in hist){var r=hist[d]&&hist[d][kd.id];if(r&&r.done&&r.done.length)n++;}return n;}
   // praise every quest at first, then less often as the habit forms; quiet ticks still say what they did
   function praiseOrNote(s,kd,per){
@@ -2241,24 +2246,50 @@
     return freshPick(kd,'e',['You were ready '+early+' minutes before it was time to go.',early+' minutes to spare. You did that!','Ready with time to spare!']);
   }
   // ---- how do you feel? (after finishing a routine) ----
+  // every feeling gets the same warm, plain reply: none is the "right" answer
   var FEEL={
-    young:{q:['How do you feel?','How are you feeling now?','How did your {part} go?'],
+    young:{q:['How do you feel?','How are you feeling now?','How did your {part} go?','How do you feel about your {part}?'],
       opts:[['good','😊','Happy'],['ok','😐','Okay'],['low','😣','Grumpy']],
-      good:['Yay! You feel happy. You did that!','A happy {part}! You made it happy.','Happy is a great feeling. It\'s all yours!','Happy! Give yourself a big hug.'],
-      ok:['Okay is fine. Thanks for telling me.','Some days are just okay. You still did it!','Okay is okay! You did your jobs.'],
-      low:['Thanks for telling me. Grumpy feelings happen. You still did your jobs!','It\'s okay to feel grumpy. Maybe a big hug will help.','Grumpy days happen to everyone. You still did it!']},
-    older:{q:['How do you feel about your {part}?','How was your {part}?','How are you feeling about getting ready today?'],
+      say:['You feel {f}. Thanks for telling me!','{F}. Thanks for sharing that with me.','You feel {f} right now. I\'m glad you told me.','{F}! All feelings are okay to have.'],
+      low:' A grown-up would like to know too.'},
+    older:{q:['How do you feel about your {part}?','How was your {part}?','How are you feeling about getting ready today?','How did your {part} feel?'],
       opts:[['good','😄','Proud'],['ok','🙂','Okay'],['low','😕','Tricky']],
-      good:['You feel proud. That feeling is all yours.','Proud is a great feeling, and you earned it yourself.','Remember this feeling. You made it happen.','You should feel proud. You did that.'],
-      ok:['Okay is fine. Not every {part} has to be amazing.','Thanks for telling me. You still got yourself ready.','Okay is a perfectly good way to feel.'],
-      low:['Thanks for telling me. Tricky {part}s happen to everyone.','That sounds tricky. You still got it done, and that matters.','Tricky days happen. You can tell a grown-up about it if you like.']}
+      say:['You feel {f}. Thanks for telling me.','{F}. Thanks for sharing how you feel.','So it felt {f}. All feelings are okay to have.','Thanks for telling me it felt {f}.'],
+      low:' You could tell a grown-up about it too.'}
   };
+  var notes=load('qb_notes',[]);
+  var NOTE_Q={young:['What was the grumpiest part of your {part}?','Was something hard today?','What would make tomorrow {part} feel better?','Do you want a cuddle and a chat?','Which job felt the trickiest?'],
+    older:['What was tricky about your {part}?','Was there one part that felt hard?','Is there anything that would make {part}s easier?','Do you want to talk about it now, or later?','What could we change for tomorrow?']};
+  function addNote(k,per,o){var kd=cfg.kids[k];
+    notes=notes.filter(function(n){return !(n.kid===kd.id&&n.date===today()&&n.per===per);});
+    notes.unshift({id:'n'+Date.now(),kid:kd.id,date:today(),per:per,word:o[2],em:o[1]});notes=notes.slice(0,30);save('qb_notes',notes);gearDot();}
+  function gearDot(){var g=document.getElementById('gearBtn');if(!g)return;var n=notes.length;g.classList.toggle('hasnote',n>0);g.setAttribute('data-n',n>9?'9+':String(n));}
+  function setNotes(inner){
+    sHead(inner,'Check-ins');
+    if(!notes.length){inner.appendChild(el('p',{'class':'muted'},'Nothing to follow up. When a child says their routine felt grumpy or tricky, a note appears here.'));return;}
+    notes.forEach(function(n,i){
+      var kd=cfg.kids.filter(function(x){return x.id===n.kid;})[0];if(!kd)return;
+      var c=sCard();
+      c.appendChild(el('div',{'class':'notehead'},n.em+' '+kd.name+' said the '+(n.per==='pm'?'afternoon':'morning')+' felt '+n.word.toLowerCase()+' · '+fmtDate(n.date)));
+      c.appendChild(el('p',{'class':'hint'},'You could ask:'));
+      var ql=el('ul',{'class':'noteqs'}),pool=NOTE_Q[ageBand(kd)].slice();
+      for(var j=0;j<3;j++){var q=pool.splice((i*7+j*3)%pool.length,1)[0];ql.appendChild(el('li',null,'“'+fillN(q,kd,n.per)+'”'));}
+      c.appendChild(ql);
+      c.appendChild(sBtn('✓ We talked','primary',function(){notes.splice(i,1);save('qb_notes',notes);gearDot();renderSettings();}));
+      inner.appendChild(c);
+    });
+  }
+  setTimeout(gearDot,0);
   function setFeel(k,per,v){
     var t=today(),kd=cfg.kids[k];if(!hist[t]||!hist[t][kd.id])recordToday();
     var r=hist[t]&&hist[t][kd.id];if(!r)return;r.feel=r.feel||{};r.feel[per]=v;save('qb_hist',hist);
   }
+  function feelDue(k){   // a few times a week at random, never twice in one day, so it stays a real question
+    var kd=cfg.kids[k],r=hist[today()]&&hist[today()][kd.id];if(r&&r.feel)return false;
+    return Math.random()<0.4;
+  }
   function feelCheck(k,per){
-    if(cfg.feelings===false)return;
+    if(cfg.feelings===false||!feelDue(k))return;
     var kd=cfg.kids[k],band=FEEL[ageBand(kd)],old=document.getElementById('feelOv');if(old)old.remove();
     var ov=el('div',{id:'feelOv'}),box=el('div',{'class':'feelbox'});
     box.appendChild(el('div',{'class':'feelkid'},kd.emoji));
@@ -2268,7 +2299,8 @@
     band.opts.forEach(function(o){
       var b=el('button',{'class':'feelbtn'});b.appendChild(el('span',{'class':'feelem'},o[1]));b.appendChild(el('span',null,o[2]));
       b.addEventListener('click',function(){clearTimeout(closeT);setFeel(k,per,o[0]);stats('feeling',o[0]);
-        var reply=fillN(freshPick(kd,'f'+o[0],band[o[0]]),kd,per);
+        var f=o[2].toLowerCase(),reply=fillN(freshPick(kd,'f',band.say),kd,per).replace(/\{f\}/g,f).replace(/\{F\}/g,o[2]);
+        if(o[0]==='low'){reply+=band.low;addNote(k,per,o);}
         row.innerHTML='';row.appendChild(el('div',{'class':'feelreply'},o[1]+' '+reply));
         say(reply,function(){setTimeout(function(){ov.remove();},1200);});setTimeout(function(){ov.remove();},9000);});
       row.appendChild(b);
@@ -2674,7 +2706,7 @@
   // ---------- settings ----------
   var sDay=new Date().getDay();
   var sBody=document.getElementById('sBody');
-  function openSettings(){sDay=new Date().getDay();if(rwWaiting().length)sTab='rewards';renderSettings();document.getElementById('settings').classList.add('open');}
+  function openSettings(){sDay=new Date().getDay();if(notes.length)sTab='notes';else if(rwWaiting().length)sTab='rewards';else if(sTab==='notes')sTab='children';renderSettings();document.getElementById('settings').classList.add('open');}
   document.getElementById('closeSettings').addEventListener('click',function(){
     save('qb_cfg',cfg);document.getElementById('settings').classList.remove('open');render();renderWx();
   });
@@ -2682,7 +2714,7 @@
 
   // ================= SETTINGS (sectioned layout) =================
   var sTab='children',sQuestView='days',openAvatar=-1,openEvent=null;
-  var S_TABS=[['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['messages','💌','Messages'],['device','📱','This device'],['about','💛','About']];
+  var S_TABS=[['notes','🔔','Check-ins'],['children','👧','Children'],['quests','✅','Quests'],['leaving','🚗','Leaving'],['events','📅','Events'],['rewards','🏆','Rewards'],['progress','📊','Progress'],['weather','🌤️','Weather'],['sound','🔊','Sound'],['messages','💌','Messages'],['device','📱','This device'],['about','💛','About']];
   function sCard(title,desc){var c=el('div',{'class':'scard'});if(title)c.appendChild(el('h3',null,title));if(desc)c.appendChild(el('p',{'class':'desc'},desc));return c;}
   function sField(label,help,controls){
     var f=el('div',{'class':'field'}),l=el('div',{'class':'fl'});l.appendChild(el('b',null,label));if(help)l.appendChild(el('span',null,help));
@@ -2726,12 +2758,14 @@
   function renderSettings(){
     var nav=document.getElementById('sNav');nav.innerHTML='';
     S_TABS.forEach(function(t){
+      if(t[0]==='notes'&&!notes.length&&sTab!=='notes')return;   // only shown when there's something to follow up
       var b=el('button',{'class':t[0]===sTab?'sel':''});b.appendChild(el('span',{'class':'ni'},t[1]));b.appendChild(el('span',null,t[2]));
+      if(t[0]==='notes')b.appendChild(el('span',{'class':'navcount'},String(notes.length)));
       b.addEventListener('click',function(){sTab=t[0];stats('settings/'+t[0],t[2]);renderSettings();sBody.scrollTop=0;});nav.appendChild(b);
     });
     sBody.innerHTML='';
     var inner=el('div',{'class':'s-inner'});sBody.appendChild(inner);
-    ({children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,messages:setMessages,device:setDevice,about:setAbout})[sTab](inner);
+    ({notes:setNotes,children:setChildren,quests:setQuests,leaving:setLeaving,events:setEvents,rewards:setRewards,progress:setProgress,weather:setWeather,sound:setSound,messages:setMessages,device:setDevice,about:setAbout})[sTab](inner);
     tipCard(inner,sTab);
   }
   function sHead(inner,title,sub){inner.appendChild(el('h2',{'class':'stitle'},title));if(sub)inner.appendChild(el('p',{'class':'ssub'},sub));}
@@ -3524,7 +3558,7 @@
     inner.appendChild(el('div',{style:'height:12px'}));
     proofCard(inner);
     var fc=sCard('💬 How they feel');
-    fc.appendChild(sField('Ask how they feel when they finish','Happy, okay or grumpy for little ones; proud, okay or tricky for older kids.',[sSwitch(cfg.feelings!==false,function(v){cfg.feelings=v;sv();renderSettings();})]));
+    fc.appendChild(sField('Ask how they feel when they finish','A few times a week, at random, so it stays a real question. If they choose grumpy or tricky, you\'ll get a note.',[sSwitch(cfg.feelings!==false,function(v){cfg.feelings=v;sv();renderSettings();})]));
     inner.appendChild(fc);
     var keys=Object.keys(hist).sort();
     var t=today0(),from=addDays(t,-(sRange-1));
