@@ -553,6 +553,9 @@
   .in-go{margin-top:10px;font-size:24px;padding:16px 40px;opacity:0;animation:inPop .5s ease-out both}
   .suprivi{font-size:54px;text-align:center}
   .suprivlist{display:flex;flex-direction:column;gap:12px;margin:6px 0 14px}.suprivrow{display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.45;color:#e6e8ff}.suprivic{font-size:24px;flex:none;width:32px;text-align:center}
+  #sampOv{position:fixed;inset:0;z-index:400;background:#1b1f3b;display:flex;align-items:center;justify-content:center;padding:20px}
+  .sampbox{background:#232858;border-radius:24px;padding:24px;max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px;color:#fff}
+  .samplist{display:grid;grid-template-columns:1fr 1fr;gap:8px}.samprow{background:#2f3670;border-radius:12px;padding:10px 12px;font-weight:700}.sampst{color:#ffd23f;font-weight:700;min-height:1.4em}
   .in-note{font-size:15px;color:#8a90c8;opacity:0;animation:inPop .5s ease-out 1.9s both;text-align:center;padding:0 24px}
   @keyframes inOut{to{opacity:0;transform:scale(1.08)}}
   .in-logo{width:min(300px,60vw);height:auto;animation:inDrop .75s cubic-bezier(.3,1.5,.5,1) both}
@@ -739,7 +742,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · setup wording and privacy';
+  var BOARD_VERSION='16 Nov 2026 · voice sample maker';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -4844,6 +4847,37 @@
   window.addEventListener('appinstalled',function(){installEvt=null;});
   function isInstalled(){try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true;}catch(e){return false;}}
   fetchHolidays();setInterval(fetchHolidays,6*3600000);
+  // ---- maker tool: open the app with ?samples=1 to record a short sample of each Kokoro voice ----
+  if(/[?&]samples=1/.test(location.search))(function(){
+    var LINE='Hi! Let\'s do our jobs together. You can do it!';
+    var ov=el('div',{id:'sampOv'}),box=el('div',{'class':'sampbox'});ov.appendChild(box);
+    box.appendChild(el('h2',null,'🎙️ Make voice samples'));
+    box.appendChild(el('p',null,'Records "'+LINE+'" in each Kokoro voice and downloads them. The first time downloads the voice (about 115 MB), so use wifi. If the browser asks to allow several downloads, say yes.'));
+    var list=el('div',{'class':'samplist'});box.appendChild(list);
+    var rows={};KOKORO_VOICES.forEach(function(v){var r=el('div',{'class':'samprow'},'⏳ '+v[1].replace(/ \(.*$/,''));rows[v[0]]=r;list.appendChild(r);});
+    var st=el('p',{'class':'sampst'},'');box.appendChild(st);
+    var go=el('button',{'class':'btn primary big'},'Make samples');box.appendChild(go);
+    var x=el('button',{'class':'linkbtn'},'Close');x.addEventListener('click',function(){ov.remove();});box.appendChild(x);
+    document.body.appendChild(ov);
+    function save(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},4000);}
+    go.addEventListener('click',function(){
+      go.disabled=true;st.textContent='Getting the voice ready…';
+      kokoroWorker(function(m){
+        if(m.type==='progress')st.textContent='Downloading the voice… '+m.pct+'%';
+        else if(m.type==='error'){st.textContent='⚠️ Couldn\'t load the voice ('+m.msg+'). Check the internet and try again.';go.disabled=false;}
+        else if(m.type==='ready'){
+          st.textContent='Recording…';var i=0;
+          (function next(){
+            if(i>=KOKORO_VOICES.length){st.textContent='✅ Done! Attach the '+KOKORO_VOICES.length+' downloaded files in the chat.';return;}
+            var v=KOKORO_VOICES[i++],name=v[1].replace(/ \(.*$/,'').toLowerCase();
+            rows[v[0]].textContent='🎙️ '+v[1].replace(/ \(.*$/,'')+'…';
+            kokoroSess(true,v[0]).predict(LINE).then(function(b){save(b,name+'.wav');rows[v[0]].textContent='✅ '+name+'.wav';setTimeout(next,700);})
+              .catch(function(){rows[v[0]].textContent='⚠️ '+name+' failed';setTimeout(next,700);});
+          })();
+        }
+      });
+    });
+  })();
 })();
 </script>
 </body>
