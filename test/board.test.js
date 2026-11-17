@@ -630,3 +630,38 @@ test('evening: the card shows what to sleep in tonight and what to lay out for t
   assert.match(t.lastSaid(),/^Tonight will be cold, so wear warm pyjamas and socks\. Tomorrow will be (warm|hot), so lay out .*your hat\. You'll need sunscreen in the morning too\.$/);
   t.close();
 });
+
+test('saved phrases: lines are split into sentences, and the likely ones are listed for both children in turn',async()=>{
+  const t=boot({cfg:c=>{c.ai={on:true,voice:'k:af_heart'};c.leave=Object.assign(c.leave||{},{remind:'15,10,5'});}});await wait(300);
+  const V=t.w.__medoVoice;
+  assert.deepEqual(V.splitSent('Hooray Ava! All done for the morning!  You earned 12 stars.'),['Hooray Ava!','All done for the morning!','You earned 12 stars.']);
+  assert.deepEqual(V.splitSent("It's quarter past 8:15 today."),["It's quarter past 8:15 today."]);
+  const L=V.phraseWants();
+  ['Hi Ava!','Hi Leo!','When you have done a job, tap its picture.','You brushed your teeth, Ava!','Fifteen minutes until we leave!',
+   'Ava, have you brushed your teeth yet?','You have 13 stars!',"It's quarter to eight."].forEach(x=>assert.ok(L.includes(x),'missing: '+x));
+  assert.ok(L.indexOf('Hi Leo!')<L.indexOf('You brushed your teeth, Ava!'),'children take turns, so no one waits for the other');
+  assert.ok(!L.some(x=>/undefined|\{/.test(x)),'no unfilled words');
+  assert.equal(new Set(L).size,L.length,'no repeats');
+  assert.ok(L.length>150&&L.length<900,'a sensible amount of work: '+L.length);
+  t.close();
+});
+
+test('saved phrases play in the natural voice even before the voice has loaded; a missing sentence uses the tablet voice for the whole line',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.ai={on:true,voice:'k:af_heart'};}});await wait(300);
+  let n=0;t.w.URL.createObjectURL=()=>'blob:clip'+(++n);t.w.URL.revokeObjectURL=()=>{};
+  t.w.Audio=function(src){this.src=src;this.play=()=>{t.played.push(src);setTimeout(()=>this.onended&&this.onended(),20);return Promise.resolve();};this.pause=()=>{};};
+  const V=t.w.__medoVoice;
+  await new Promise(res=>{const rq=t.w.indexedDB.open('qb_voice',1);rq.onsuccess=()=>{const tx=rq.result.transaction('c','readwrite');
+    ['Me do!','I can do it myself!'].forEach(x=>{tx.objectStore('c').put({b:'wav',u:'2026-01-01'},'k:af_heart|'+x);V.VC.keys['k:af_heart|'+x]=1;});tx.oncomplete=()=>{rq.result.close();res();};};});
+  const before=t.spoken.length;
+  t.d.getElementById('brand').click();await wait(400);
+  assert.deepEqual(t.played.filter(x=>/^blob:clip/.test(x)),['blob:clip1','blob:clip2'],'both sentences played from saved clips, in order');
+  assert.equal(t.spoken.length,before,'the tablet voice stayed quiet');
+  delete V.VC.keys['k:af_heart|I can do it myself!'];delete V.VC.mem['k:af_heart|I can do it myself!'];
+  t.d.getElementById('brand').click();await wait(300);
+  assert.equal(t.lastSaid(),'Me do! I can do it myself!','one voice for the whole line, never half and half');
+  const heard=JSON.parse(t.w.localStorage.getItem('qb_heard')||'{}');
+  await wait(2200);
+  assert.ok((JSON.parse(t.w.localStorage.getItem('qb_heard'))['Me do!']||[0])[0]>=2,'remembers what it says most');
+  t.close();
+});

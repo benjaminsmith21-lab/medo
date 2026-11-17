@@ -762,7 +762,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='16 Nov 2026 · evening clothes';
+  var BOARD_VERSION='18 Nov 2026 · saved voice phrases';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1065,7 +1065,13 @@
   function aiStatus(){
     var e=document.getElementById('aiStatus');if(!e)return;
     if(!cfg.ai.on)e.textContent='Off: using the '+devWord()+'\'s own voice.';
-    else if(AI.state==='ready'&&(AI.slowN||0)>=3)e.textContent='🐢 This voice is too slow on this '+devWord()+', so the built-in voice is filling in. Try a Piper voice instead.';
+    else if(AI.state==='ready'&&isKokoro(cfg.ai.voice)){
+      var c=bgCount(),all=c[0]>=c[1];
+      e.textContent=(all?'✅ Natural voice ready. All '+c[1]+' usual sentences are saved, so it speaks straight away.'
+        :'⏳ Natural voice ready. Saving the usual sentences so it can speak straight away: '+c[0]+' of '+c[1]+' done. This happens while nobody is using the board, and only takes a while the first time.')+
+        (!all&&(AI.slowN||0)>=3?' Until then, the '+devWord()+'\'s own voice fills in for new sentences.':'');
+    }
+    else if(AI.state==='ready'&&(AI.slowN||0)>=3)e.textContent='🐢 This voice is too slow on this '+devWord()+', so the built-in voice is filling in. Try a Kokoro voice instead.';
     else if(AI.state==='ready')e.textContent='✅ Natural voice ready (saved on this device, works offline).';
     else if(AI.state==='loading')e.textContent='⏳ Downloading the voice… '+(AI.pct?AI.pct+'%':'')+' (the '+devWord()+'\'s own voice is used until it is ready)';
     else if(AI.state==='error')e.textContent='⚠️ Couldn\'t load the natural voice, so the '+devWord()+'\'s own voice is being used. ('+AI.err+')';
@@ -1106,6 +1112,7 @@
     if(!KW){
       try{KW=new Worker(new URL('tts/kokoro/worker.js',location.href),{type:'module'});}catch(e){onStatus({type:'error',msg:'background voice not supported'});return;}
       KW.onmessage=function(e){var d=e.data||{};
+        if(d.type==='ready'){KW.ready=true;setTimeout(kwPump,0);}
         if(d.type==='audio'||d.type==='fail'){var w=kwWait[d.id];delete kwWait[d.id];if(w)(d.type==='audio'?w[0](d.blob):w[1]());}
         else if(KW.onStatus)KW.onStatus(d);};
       KW.onerror=function(){if(KW.onStatus)KW.onStatus({type:'error',msg:'voice worker stopped'});};
@@ -1113,10 +1120,23 @@
     KW.onStatus=onStatus;
     KW.postMessage({type:'load',wasm:new URL('tts/kokoro/',location.href).href});
   }
-  function kokoroSess(_,v){var id=v.slice(2);
-    return {predict:function(text){return new Promise(function(res,rej){
-      if(Object.keys(kwWait).length){rej();return;}   // still working on the last line: don't queue up
-      var n=++kwN;kwWait[n]=[res,rej];KW.postMessage({type:'say',id:n,text:text,voice:id});});}};}
+  // One sentence at a time goes to the worker. Lines someone is waiting to hear go first;
+  // background work (saving phrases for later) only runs while nobody is using the board.
+  var KQ={live:[],bg:[],busy:false};
+  function kwJob(text,voice,live,tok){return new Promise(function(res,rej){
+    var q=live?KQ.live:KQ.bg;if(q.length>=8){rej();return;}
+    q.push({text:text,voice:voice,res:res,rej:rej,tok:tok});kwPump();});}
+  function kwPump(){
+    if(KQ.busy||!KW||!KW.ready)return;
+    var j=null;
+    while(KQ.live.length){j=KQ.live.shift();if(j.tok!=null&&j.tok!==speechTicket){j.rej();j=null;continue;}break;}   // nobody is waiting for it any more
+    if(!j&&KQ.bg.length)j=KQ.bg.shift();
+    if(!j)return;
+    KQ.busy=true;var n=++kwN;
+    kwWait[n]=[function(b){KQ.busy=false;j.res(b);kwPump();},function(){KQ.busy=false;j.rej();kwPump();}];
+    KW.postMessage({type:'say',id:n,text:j.text,voice:j.voice.slice(2)});
+  }
+  function kokoroSess(_,v){return {predict:function(text,tok){return kwJob(text,v,true,tok);}};}
   // Only one voice may ever speak at a time. Every new line gets a ticket number; anything still
   // arriving for an older ticket (a slow AI clip, a fallback) is thrown away instead of talking over it.
   var speechTicket=0;
@@ -1137,15 +1157,100 @@
       deviceSay(text,done,tok);
     });
   }
-  function aiSay(text,done,tok){
-    if(AI.cache[text]){aiPlay(AI.cache[text],text,tok,done);return;}
-    var late=false,slow=setTimeout(function(){late=true;AI.slowN=(AI.slowN||0)+1;aiStatus();if(tok===speechTicket)deviceSay(text,done,tok);},1200);
-    AI.sess.predict(text).then(function(wav){
-      clearTimeout(slow);if(!late)AI.slowN=0;
-      var url=URL.createObjectURL(wav);AI.cache[text]=url;AI.order.push(text);
-      if(AI.order.length>80){var old=AI.order.shift();try{URL.revokeObjectURL(AI.cache[old]);}catch(e){}delete AI.cache[old];}
-      if(!late)aiPlay(url,text,tok,done);   // too slow this time: it's saved for next time
-    }).catch(function(){clearTimeout(slow);if(!late&&tok===speechTicket)deviceSay(text,done,tok);});
+  // ----- Saved voice clips -----
+  // Every sentence is made once in the natural voice and kept on this device (IndexedDB 'qb_voice').
+  // While the board sits idle, the sentences it is likely to say are made ahead of time, so the
+  // natural voice can start straight away and the tablet's own voice rarely has to fill in.
+  var VC={db:null,p:null,keys:{},ready:false,mem:{},memOrder:[],pend:{},heard:load('qb_heard',{}),n:0};
+  function vcKey(v,t){return v+'|'+t;}
+  function splitSent(t){return String(t||'').replace(/\s+/g,' ').trim().split(/(?<=[.!?])\s+(?=[A-Z0-9"'\u201c\u2018])/).filter(Boolean);}
+  function vcOpen(){
+    if(VC.p)return VC.p;
+    VC.p=new Promise(function(res){
+      try{var rq=indexedDB.open('qb_voice',1);
+        rq.onupgradeneeded=function(){rq.result.createObjectStore('c');};
+        rq.onsuccess=function(){VC.db=rq.result;
+          try{var g=VC.db.transaction('c').objectStore('c').getAllKeys();
+            g.onsuccess=function(){(g.result||[]).forEach(function(k){VC.keys[k]=1;});VC.ready=true;res(VC.db);};
+            g.onerror=function(){VC.ready=true;res(VC.db);};}catch(e){VC.ready=true;res(VC.db);}};
+        rq.onerror=rq.onblocked=function(){res(null);};
+      }catch(e){res(null);}
+    });
+    return VC.p;
+  }
+  function vcHas(v,t){var k=vcKey(v,t);return !!(VC.keys[k]||VC.mem[k]);}
+  function vcMem(k,blob){
+    var url=URL.createObjectURL(blob);VC.mem[k]=url;VC.memOrder.push(k);
+    if(VC.memOrder.length>60){var o=VC.memOrder.shift();try{URL.revokeObjectURL(VC.mem[o]);}catch(e){}delete VC.mem[o];}
+    return url;
+  }
+  function vcGet(v,t){
+    var k=vcKey(v,t);if(VC.mem[k])return Promise.resolve(VC.mem[k]);
+    return vcOpen().then(function(db){if(!db)return null;return new Promise(function(res){
+      try{var r=db.transaction('c').objectStore('c').get(k);
+        r.onsuccess=function(){var val=r.result;if(!val||!val.b){delete VC.keys[k];res(null);return;}
+          res(VC.mem[k]||vcMem(k,val.b));
+          if(val.u!==today()){val.u=today();try{db.transaction('c','readwrite').objectStore('c').put(val,k);}catch(e){}}};
+        r.onerror=function(){res(null);};
+      }catch(e){res(null);}
+    });});
+  }
+  function vcPut(v,t,blob){
+    var k=vcKey(v,t);if(erasing)return;VC.keys[k]=1;
+    vcOpen().then(function(db){if(!db||erasing)return;try{db.transaction('c','readwrite').objectStore('c').put({b:blob,u:today()},k);}catch(e){}});
+  }
+  // what the board actually says, so the lines heard most get made first
+  function noteHeard(parts){
+    var d=today();
+    parts.forEach(function(x){var h=VC.heard[x];if(!h)h=VC.heard[x]=[0,d];h[0]++;h[1]=d;});
+    var ks=Object.keys(VC.heard);
+    if(ks.length>500)ks.sort(function(a,b){return VC.heard[a][0]-VC.heard[b][0];}).slice(0,ks.length-400).forEach(function(x){delete VC.heard[x];});
+    clearTimeout(VC.hs);VC.hs=setTimeout(function(){save('qb_heard',VC.heard);},2000);
+  }
+  function heardTop(min){
+    var cut=ymd(addDays(today0(),-30));
+    return Object.keys(VC.heard).filter(function(x){var h=VC.heard[x];return h[0]>=min&&h[1]>=cut;})
+      .sort(function(a,b){return VC.heard[b][0]-VC.heard[a][0];}).slice(0,150);
+  }
+  function genClip(t,tok){
+    var v=AI.voice,k=vcKey(v,t);
+    if(VC.pend[k])return VC.pend[k];
+    var p=AI.sess.predict(t,tok).then(function(b){vcPut(v,t,b);return VC.mem[k]||vcMem(k,b);});
+    VC.pend[k]=p;var clr=function(){delete VC.pend[k];};p.then(clr,clr);
+    return p;
+  }
+  // Play a line sentence by sentence: saved clips straight away; anything new is made in order while
+  // the earlier sentences play. If a new one isn't ready in time, the tablet voice says the rest
+  // (and the sentence is saved for next time).
+  function clipSay(v,parts,done,tok,canGen){
+    var chain=Promise.resolve(),madeAny=false;
+    var got=parts.map(function(t){
+      var k=vcKey(v,t);
+      if(VC.mem[k])return Promise.resolve(VC.mem[k]);
+      var disk=VC.keys[k]?vcGet(v,t):Promise.resolve(null);
+      return disk.then(function(u){
+        if(u||!canGen)return u;
+        madeAny=true;
+        chain=chain.then(function(){return genClip(t,tok).catch(function(){return null;});});
+        return chain;
+      });
+    });
+    var i=0,first=true;
+    function next(){
+      if(tok!==speechTicket)return;
+      if(i>=parts.length){if(done)done();return;}
+      var idx=i++,settled=false;
+      var wait=setTimeout(function(){if(settled)return;settled=true;
+        if(madeAny){AI.slowN=(AI.slowN||0)+1;aiStatus();}
+        deviceSay(parts.slice(idx).join(' '),done,tok);},first?1200:1500);
+      got[idx].then(function(u){
+        if(settled)return;settled=true;clearTimeout(wait);
+        if(!u){deviceSay(parts.slice(idx).join(' '),done,tok);return;}
+        if(first&&madeAny)AI.slowN=0;
+        first=false;aiPlay(u,parts[idx],tok,next);
+      });
+    }
+    next();
   }
   // say(text[, done]): done() runs once speaking finishes (or after a sensible guess if the device never reports it)
   function say(text,done){
@@ -1155,7 +1260,11 @@
     stopSpeaking(); // silence whatever was playing, from either voice
     if(!cfg.voice){if(cb)setTimeout(cb,600);return;}
     if(cfg.ai&&cfg.ai.on){
-      if(AI.state==='ready'){aiSay(text,cb,tok);return;}
+      var v=cfg.ai.voice,parts=splitSent(text);
+      noteHeard(parts);
+      if(AI.state==='ready'&&AI.voice===v){clipSay(v,parts,cb,tok,true);return;}
+      // the voice isn't loaded yet, but every sentence is already saved: play them anyway
+      if(parts.length&&parts.every(function(x){return vcHas(v,x);})){clipSay(v,parts,cb,tok,false);aiLoad();return;}
       aiLoad();
     }
     deviceSay(text,cb,tok);
@@ -1176,6 +1285,114 @@
       speechSynthesis.speak(u);
     }catch(e){}
   }
+
+  // ----- Making phrases ahead of time, while the board is idle -----
+  // Waits until nobody has touched the board for 2 minutes, makes one sentence at a time in the
+  // background worker, and stops as soon as someone touches the screen.
+  var BG={last:Date.now(),working:false,list:null,listAt:0,failed:{},pruned:''};
+  document.addEventListener('pointerdown',function(){BG.last=Date.now();},true);
+  document.addEventListener('keydown',function(){BG.last=Date.now();},true);
+  function bgAllowed(){
+    if(!cfg.ai||!cfg.ai.on||!isKokoro(cfg.ai.voice)||!cfg.voice)return false;
+    if(firstRun&&!cfg.setupDone)return false;
+    if(!cfg.kids.some(function(kd){return kd&&kd.name;}))return false;
+    return true;
+  }
+  function bgIdle(){return !document.hidden&&Date.now()-BG.last>=120000;}
+  function allStepsFor(k){
+    var ids={};
+    for(var di=0;di<7;di++){var d=cfg.days&&cfg.days[di];((d&&d.kids&&d.kids[k])||[]).forEach(function(id){ids[id]=1;});}
+    try{eventQuestIds(k).forEach(function(id){ids[id]=1;});}catch(e){}
+    if(cfg.autoSun!==false&&ids.bag)ids.sunscreen=1;
+    return cfg.steps.filter(function(x){return ids[x.id];});
+  }
+  // The sentences Medo is likely to say, most-heard first. Lines with a number in them (stars,
+  // minutes) are guessed for the next value. Anything missed is saved the first time it's said.
+  function phraseWants(){
+    var tiers=[[],[],[],[]],seen={};
+    function add(n,t){splitSent(t).forEach(function(x){if(!seen[x]){seen[x]=1;tiers[n].push(x);}});}
+    var kids=[];cfg.kids.forEach(function(kd,k){if(kd&&kd.name)kids.push([kd,k]);});
+    // tier 0: today's weather, and anything the board says often
+    try{if(wx&&wx.date===today()){add(0,weatherSpeech());add(0,eveningSpeech());}}catch(e){}
+    heardTop(2).forEach(function(x){add(0,x);});
+    // tier 1: ticking quests and finishing, for each child in turn
+    var per1=[];
+    kids.forEach(function(a){var kd=a[0],k=a[1],nm=kd.name,band=ageBand(kd),steps=allStepsFor(k),L=[];
+      function P(t){L.push(t);}
+      P('Hi '+nm+'! When you have done a job, tap its picture.');
+      steps.forEach(function(x){var p=pastPhrase(x);P(p+'.');P(p+'!');P(p+', '+nm+'!');});
+      ['am','pm'].forEach(function(per){PRAISE_D[band].forEach(function(l){P(fillN(l,kd,per));});});
+      P('Hooray '+nm+'! All done for the morning! All done for the afternoon!');
+      P('You did it all by yourself, '+nm+'!');
+      var sc=(kd.stars&&kd.stars.count||0)+1;
+      P('You earned a star for your star jar! You have '+sc+(sc===1?' star!':' stars!'));
+      if(band==='young')P('You were ready before the runner got to the car! You beat the runner to the car! The runner isn\'t even at the car yet, and you\'re ready! Ready before the runner! Wow!');
+      else P('Ready with time to spare!');
+      var F=FEEL[band];
+      ['am','pm'].forEach(function(per){F.q.forEach(function(q){q=fillN(q,kd,per);P(nm+', '+q.charAt(0).toLowerCase()+q.slice(1));});});
+      F.opts.forEach(function(o){F.say.forEach(function(r){P(r.replace(/\{f\}/g,o[2].toLowerCase()).replace(/\{F\}/g,o[2]));});});
+      P(F.low);
+      PRAISE_N.forEach(function(w){P(w+', '+nm+'!');});
+      if(cfg.leave.remind&&cfg.leave.ask!==false)steps.forEach(function(x){P(nm+', '+askDone(x));});
+      per1.push(L);
+    });
+    for(var r=0;per1.some(function(L){return r<L.length;});r++)per1.forEach(function(L){if(r<L.length)add(1,L[r]);});   // take turns, so no child waits
+    // tier 2: leaving, the clock, rewards and the rest
+    var marks=(cfg.leave.remind||'').split(',').filter(Boolean).map(Number),evs=[''];
+    (cfg.events||[]).forEach(function(ev){if(ev.leave&&ev.name)evs.push(ev.name);});
+    marks.forEach(function(m){if(MINW[m])evs.forEach(function(n){add(2,MINW[m]+' minutes until we leave'+(n?' for '+n:'')+'!');});});
+    if(marks.length){add(2,kids.length>1?'Everyone is ready. Great job!':'You\'re all ready. Great job!');
+      kids.forEach(function(a){add(2,a[0].name+' is all ready!');});}
+    if(+cfg.leave.heads)add(2,'We have to leave in '+durPhrase(+cfg.leave.heads)+'. Time to get ready!');
+    add(2,'Oops, wrong one? Hold your finger on it to undo.');
+    add(2,'Me do! I can do it myself!');
+    var lv={};for(var dj=0;dj<7;dj++){var dd=cfg.days&&cfg.days[dj];if(dd&&dd.leave)lv[dd.leave]=1;}
+    Object.keys(lv).forEach(function(t){var h=+t.split(':')[0],m=+t.split(':')[1];
+      add(2,'We have to leave at '+(m%5===0?clockPhrase(h,m):(hourWord(h)+' '+m))+'.');});
+    try{add(2,'It\'s time to go! Shoes on and '+destPhrase()+'!');}catch(e){}
+    kids.forEach(function(a){var kd=a[0],k=a[1];
+      try{rewardsFor(k).forEach(function(x){var rw=x.rw;
+        add(2,rw.kind==='money'?'You earned '+moneySay(rw.amount)+' for your money jar! Tell a grown-up!':'You earned a reward: '+rw.prize+'! Tell a grown-up!');});}catch(e){}
+      try{if(hasReading(k)){var rs=stepById('reading'),rc=(kd.reads.count||0)+1;if(rs)add(2,pastPhrase(rs)+'! That is '+rc+(rc===1?' day':' days')+' of reading. Great job!');}}catch(e){}
+      allStepsFor(k).forEach(function(x){PRAISE.forEach(function(w){add(2,pastPhrase(x)+', '+w+'!');});});
+    });
+    add(2,'Surprise! Guess what? Here\'s a surprise! Oh! A surprise!');
+    // tier 3: what time it is, around the morning and afternoon routines
+    [[6,0,9,30],[14,30,19,0]].forEach(function(w){for(var t=w[0]*60+w[1];t<=w[2]*60+w[3];t+=5)add(3,'It\'s '+clockPhrase(Math.floor(t/60),t%60)+'.');});
+    for(var mi=1;mi<=45;mi++){add(3,'That\'s in '+durPhrase(mi)+'.');if(mi<=5)add(3,'That\'s in just '+durPhrase(mi)+', so it\'s nearly time to go!');}
+    return tiers[0].concat(tiers[1],tiers[2],tiers[3]);
+  }
+  function bgWants(){var wa=wx&&wx.at;if(!BG.list||Date.now()-BG.listAt>10*60000||BG.wxAt!==wa){BG.wxAt=wa;try{BG.list=phraseWants();}catch(e){BG.list=[];}BG.listAt=Date.now();}return BG.list;}
+  function bgCount(){var v=cfg.ai.voice,L=bgWants(),n=0;L.forEach(function(x){if(vcHas(v,x))n++;});return [n,L.length];}
+  function bgTick(){
+    if(BG.working||!bgAllowed()||!bgIdle()||!VC.ready)return;
+    if(AI.state!=='ready'||AI.voice!==cfg.ai.voice){if(AI.state!=='loading')aiLoad();return;}
+    if(KQ.busy||KQ.live.length)return;
+    var v=cfg.ai.voice,L=bgWants(),t=null;
+    for(var i=0;i<L.length;i++)if(!vcHas(v,L[i])&&!BG.failed[L[i]]){t=L[i];break;}
+    if(!t){vcPrune(v,L);return;}
+    BG.working=true;
+    kwJob(t,v,false).then(function(b){vcPut(v,t,b);},function(){BG.failed[t]=1;}).then(function(){
+      BG.working=false;
+      if(document.getElementById('aiStatus'))aiStatus();
+      setTimeout(bgTick,250);   // keep going while the board stays idle
+    });
+  }
+  setInterval(bgTick,15000);
+  // once a day: drop clips nobody needs (another voice, or unused for two months)
+  function vcPrune(v,wants){
+    if(BG.pruned===today()||!VC.db)return;BG.pruned=today();
+    var want={};wants.forEach(function(x){want[vcKey(v,x)]=1;});
+    var cutOther=ymd(addDays(today0(),-3)),cutOld=ymd(addDays(today0(),-60));
+    try{var cur=VC.db.transaction('c','readwrite').objectStore('c').openCursor();
+      cur.onsuccess=function(){var c=cur.result;if(!c)return;var k=c.key,u=(c.value&&c.value.u)||'';
+        var other=k.indexOf(v+'|')!==0;
+        if((other&&u<cutOther)||(!other&&!want[k]&&u<cutOld)){c.delete();delete VC.keys[k];}
+        c.continue();};
+    }catch(e){}
+  }
+  vcOpen();
+  try{window.__medoVoice={splitSent:splitSent,phraseWants:phraseWants,vcHas:vcHas,VC:VC,bgCount:bgCount};}catch(e){}
 
   // ---------- wake lock ----------
   var wl=null;
@@ -2182,7 +2399,8 @@
       recordToday();
       var newRw=rewardsFor(k).filter(function(x){return x.p.earned&&rwBefore.indexOf(x.rw.id)<0;})[0];
       if(newRw){var sp=newRw.rw.show===false?freshPick(kd,'s',['Surprise! ','Guess what? Surprise! ','Here\'s a surprise! ','Oh! A surprise! ']):'And ';
-        lines.push(newRw.rw.kind==='money'?sp+'You earned '+moneySay(newRw.rw.amount)+' for your money jar! Tell a grown-up!':sp+'You earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');}
+        if(sp==='And ')sp='And y';else sp+='Y';
+        lines.push(newRw.rw.kind==='money'?sp+'ou earned '+moneySay(newRw.rw.amount)+' for your money jar! Tell a grown-up!':sp+'ou earned a reward: '+newRw.rw.prize+'! Tell a grown-up!');}
       var newB=trophOn()?updTrophies(k).news:[];
       if(newB.length)lines.push('You won a new badge: '+newsTitle(newB[0])+'!'+(newB.length>1?' And '+(newB.length-1)+' more!':'')+' Look in your trophy case.');
       if(newRw&&!milestone){bigFanfare();confetti(k,['🎁','🎉','⭐','🏆','✨']);showBanner(newRw.rw.kind==='money'?'💰':(newRw.rw.emoji||'🎁'),kd.name+' earned: '+rwPrize(newRw.rw)+'!');}
@@ -2365,9 +2583,9 @@
     if(!m)return 'don\'t forget: '+s.label.toLowerCase()+'.';
     return 'have you '+(PARTICIPLE[m[1]]||m[1])+m[2]+' yet?';
   }
-  var NUMW={2:'Two',3:'Three',5:'Five',10:'Ten',15:'Fifteen',20:'Twenty'};
+  var MINW={2:'Two',3:'Three',5:'Five',10:'Ten',15:'Fifteen',20:'Twenty'};
   function remindLine(D,mins){
-    var out=[NUMW[mins]+' minutes until we leave'+(D.name?' for '+D.name:'')+'!'],per=curPeriod(),ready=[];
+    var out=[MINW[mins]+' minutes until we leave'+(D.name?' for '+D.name:'')+'!'],per=curPeriod(),ready=[];
     cfg.kids.forEach(function(kd,k){
       var next=todaysSteps(k,per).filter(function(x){return prog.done[k].indexOf(x.id)<0;})[0];
       if(next){if(cfg.leave.ask!==false)out.push(kd.name+', '+askDone(next));}
@@ -2749,6 +2967,7 @@
     erasing=true;   // nothing may be saved again before the reload
     try{Object.keys(localStorage).forEach(function(k){if(/^qb_/.test(k))localStorage.removeItem(k);});}catch(e){}
     var go=function(){try{sessionStorage.clear();}catch(e){}location.reload();};
+    try{if(VC.db)VC.db.close();indexedDB.deleteDatabase('qb_voice');}catch(e){}   // saved voice clips
     try{var rq=indexedDB.deleteDatabase('qb_photos');rq.onsuccess=rq.onerror=rq.onblocked=go;setTimeout(go,1500);}catch(e){go();}
   }
   function sBtn(text,cls,fn){var b=el('button',{'class':'btn'+(cls?' '+cls:'')},text);b.addEventListener('click',fn);return b;}
