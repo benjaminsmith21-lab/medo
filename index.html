@@ -762,7 +762,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='18 Nov 2026 · saved voice phrases';
+  var BOARD_VERSION='18 Nov 2026 · faster voice saving';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1069,6 +1069,7 @@
       var c=bgCount(),all=c[0]>=c[1];
       e.textContent=(all?'✅ Natural voice ready. All '+c[1]+' usual sentences are saved, so it speaks straight away.'
         :'⏳ Natural voice ready. Saving the usual sentences so it can speak straight away: '+c[0]+' of '+c[1]+' done. This happens while nobody is using the board, and only takes a while the first time.')+
+        (AI.genS&&KW?' About '+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence on this '+devWord()+(KW.iso?', using '+Math.min(4,Math.ceil((KW.cores||1)/2))+' processor cores.':', using 1 processor core.'):'')+
         (!all&&(AI.slowN||0)>=3?' Until then, the '+devWord()+'\'s own voice fills in for new sentences.':'');
     }
     else if(AI.state==='ready'&&(AI.slowN||0)>=3)e.textContent='🐢 This voice is too slow on this '+devWord()+', so the built-in voice is filling in. Try a Kokoro voice instead.';
@@ -1112,7 +1113,8 @@
     if(!KW){
       try{KW=new Worker(new URL('tts/kokoro/worker.js',location.href),{type:'module'});}catch(e){onStatus({type:'error',msg:'background voice not supported'});return;}
       KW.onmessage=function(e){var d=e.data||{};
-        if(d.type==='ready'){KW.ready=true;setTimeout(kwPump,0);}
+        if(d.type==='ready'){KW.ready=true;KW.iso=d.iso;KW.cores=d.cores;setTimeout(kwPump,0);}
+        if(d.type==='audio'&&d.ms){var sec=d.ms/1000;AI.genS=AI.genS?AI.genS*0.8+sec*0.2:sec;}   // how long a sentence takes on this device
         if(d.type==='audio'||d.type==='fail'){var w=kwWait[d.id];delete kwWait[d.id];if(w)(d.type==='audio'?w[0](d.blob):w[1]());}
         else if(KW.onStatus)KW.onStatus(d);};
       KW.onerror=function(){if(KW.onStatus)KW.onStatus({type:'error',msg:'voice worker stopped'});};
@@ -1298,7 +1300,7 @@
     if(!cfg.kids.some(function(kd){return kd&&kd.name;}))return false;
     return true;
   }
-  function bgIdle(){return !document.hidden&&Date.now()-BG.last>=120000;}
+  function bgIdle(){return !document.hidden&&Date.now()-BG.last>=45000;}
   function allStepsFor(k){
     var ids={};
     for(var di=0;di<7;di++){var d=cfg.days&&cfg.days[di];((d&&d.kids&&d.kids[k])||[]).forEach(function(id){ids[id]=1;});}
@@ -5288,6 +5290,16 @@
   // Offline support + install as an app
   var swReg=null;
   try{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){swReg=r;}).catch(function(){});}catch(e){}
+  // The service worker adds the headers that let the voice use several processor cores. A page that
+  // opened before the worker was in charge doesn't have them yet: reload once (only once per session).
+  function coiReload(){
+    try{if(window.crossOriginIsolated||!navigator.serviceWorker||!navigator.serviceWorker.controller)return;
+      if(sessionStorage.getItem('qb_coi'))return;
+      var busy=document.querySelector('#setupOv.show,.pkov,#feelOv')||document.getElementById('settings').classList.contains('open')||Date.now()-BG.last<20000;
+      if(busy){setTimeout(coiReload,30000);return;}   // not while someone is using it: try again later
+      sessionStorage.setItem('qb_coi','1');location.reload();}catch(e){}
+  }
+  try{if('serviceWorker' in navigator&&location.protocol==='https:'){setTimeout(coiReload,1500);navigator.serviceWorker.addEventListener('controllerchange',function(){setTimeout(coiReload,500);});}}catch(e){}
   document.getElementById('updBar').addEventListener('click',applyUpdate);
   var installEvt=null;
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;});

@@ -24,7 +24,7 @@ let tts = null, loading = null, queue = Promise.resolve();
 self.onmessage = (e) => {
   const d = e.data || {};
   if (d.type === 'load') {
-    if (tts) { postMessage({ type: 'ready' }); return; }
+    if (tts) { postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1 }); return; }
     if (loading) return;
     env.wasmPaths = d.wasm;
     loading = KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
@@ -33,7 +33,7 @@ self.onmessage = (e) => {
         if (p && p.status === 'progress' && /\.onnx$/.test(p.file || '') && p.progress != null)
           postMessage({ type: 'progress', pct: Math.round(p.progress) });
       },
-    }).then((t) => { tts = t; postMessage({ type: 'ready' }); })
+    }).then((t) => { tts = t; postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1 }); })
       .catch((err) => { loading = null; postMessage({ type: 'error', msg: String((err && err.message) || err).slice(0, 120) }); });
     return;
   }
@@ -41,8 +41,9 @@ self.onmessage = (e) => {
     // one sentence at a time: the model can't run two at once
     queue = queue.then(async () => {
       try {
+        const t0 = performance.now();
         const a = await tts.generate(d.text, { voice: d.voice });
-        postMessage({ type: 'audio', id: d.id, blob: wav16(a.audio, a.sampling_rate) });
+        postMessage({ type: 'audio', id: d.id, blob: wav16(a.audio, a.sampling_rate), ms: Math.round(performance.now() - t0) });
       } catch (err) {
         postMessage({ type: 'fail', id: d.id });
       }

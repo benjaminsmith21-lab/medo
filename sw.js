@@ -20,6 +20,18 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
+// Headers that switch on "cross-origin isolation". Without them the voice engine may only use one
+// processor core; with them it uses up to four, which makes the natural voice several times faster.
+// GitHub Pages can't send these headers, so the service worker adds them to the board's own files.
+// "credentialless" still lets the fonts and other sites' files load as before.
+function iso(res) {
+  if (!res || res.status === 0 || res.type === 'opaque' || res.type === 'opaqueredirect') return res;
+  const h = new Headers(res.headers);
+  h.set('Cross-Origin-Opener-Policy', 'same-origin');
+  h.set('Cross-Origin-Embedder-Policy', 'credentialless');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -39,6 +51,7 @@ self.addEventListener('fetch', (e) => {
           return res;
         })
         .catch(() => caches.match('./index.html').then((hit) => hit || caches.match('./')))
+        .then(iso)
     );
     return;
   }
@@ -48,7 +61,7 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;
-    })));
+    })).then(iso));
     return;
   }
 
@@ -60,6 +73,6 @@ self.addEventListener('fetch', (e) => {
         return res;
       }).catch(() => hit);
       return hit || net;
-    })
+    }).then(iso)
   );
 });
