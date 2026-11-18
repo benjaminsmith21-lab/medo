@@ -665,3 +665,17 @@ test('saved phrases play in the natural voice even before the voice has loaded; 
   assert.ok((JSON.parse(t.w.localStorage.getItem('qb_heard'))['Me do!']||[0])[0]>=2,'remembers what it says most');
   t.close();
 });
+
+test('saved phrases: "Save them all now" shows progress and can be paused',async()=>{
+  const t=boot({idb:true,cfg:c=>{c.ai={on:true,voice:'k:af_heart'};}});await wait(400);
+  t.w.Worker=function(){this.postMessage=()=>{};this.terminate=()=>{};};   // a voice that is still loading
+  t.openSettings('Sound');await wait(100);
+  const b=t.d.getElementById('aiNow'),bar=t.d.getElementById('aiBar');
+  assert.ok(b&&b.style.display!=='none','button shows while sentences are still to be saved');
+  assert.notEqual(bar.style.display,'none');
+  b.click();await wait(50);
+  assert.equal(t.d.getElementById('aiNow').textContent,'Pause');
+  await wait(500);t.d.getElementById("aiNow").click();await wait(50);
+  assert.match(t.d.getElementById('aiNow').textContent,/Save them all now/);
+  t.close();
+});

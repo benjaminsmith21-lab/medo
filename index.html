@@ -622,6 +622,7 @@
   .rwtypes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .rwtype{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:2px solid #343b78;background:#1a1e46;color:#fff;font-family:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer}
   .rwtype.mom{padding:14px}.rwtype.mom b{display:block;font-size:17px}.rwtype.mom small{display:block;font-weight:600;color:#aab3e6;font-size:13px;margin-top:2px}.rwtype.mom .rwti{font-size:30px}
+  .vbar{height:10px;border-radius:6px;background:rgba(0,0,0,.08);overflow:hidden;margin-top:8px}.vbar i{display:block;height:100%;width:0;background:var(--accent,#3b82f6);border-radius:6px;transition:width .4s}
   .recstage{display:flex;gap:16px;align-items:center}.recside{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;margin:0 auto}
   .recprev{flex:1;min-width:0;width:100%;max-height:260px;background:#000;border-radius:16px;object-fit:cover}
   @media (max-width:560px){.recstage{flex-direction:column}}.recprev.live{transform:scaleX(-1)}
@@ -762,7 +763,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='18 Nov 2026 · faster voice saving';
+  var BOARD_VERSION='18 Nov 2026 · save voice now';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1068,15 +1069,30 @@
     else if(AI.state==='ready'&&isKokoro(cfg.ai.voice)){
       var c=bgCount(),all=c[0]>=c[1];
       e.textContent=(all?'✅ Natural voice ready. All '+c[1]+' usual sentences are saved, so it speaks straight away.'
-        :'⏳ Natural voice ready. Saving the usual sentences so it can speak straight away: '+c[0]+' of '+c[1]+' done. This happens while nobody is using the board, and only takes a while the first time.')+
-        (AI.genS&&KW?' About '+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence on this '+devWord()+(KW.iso?', using '+Math.min(4,Math.ceil((KW.cores||1)/2))+' processor cores.':', using 1 processor core.'):'')+
+        :'⏳ Saving the usual sentences in the natural voice so it can speak straight away: '+c[0]+' of '+c[1]+' done.'+
+          (AI.genS?' About '+Math.max(1,Math.round((c[1]-c[0])*AI.genS/60))+' minutes to go.':'')+
+          (BG.now?' Working flat out. Keep this screen open.':' It keeps going in the background while the board is on.'))+
+        (AI.genS&&KW?' ('+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence, '+(KW.iso?Math.min(4,Math.ceil((KW.cores||1)/2))+' processor cores)':'1 processor core)'):'')+
         (!all&&(AI.slowN||0)>=3?' Until then, the '+devWord()+'\'s own voice fills in for new sentences.':'');
     }
+    else if(AI.state==='loading'&&BG.now)e.textContent='⏳ Downloading the voice first… '+(AI.pct?AI.pct+'%':'');
     else if(AI.state==='ready'&&(AI.slowN||0)>=3)e.textContent='🐢 This voice is too slow on this '+devWord()+', so the built-in voice is filling in. Try a Kokoro voice instead.';
     else if(AI.state==='ready')e.textContent='✅ Natural voice ready (saved on this device, works offline).';
     else if(AI.state==='loading')e.textContent='⏳ Downloading the voice… '+(AI.pct?AI.pct+'%':'')+' (the '+devWord()+'\'s own voice is used until it is ready)';
     else if(AI.state==='error')e.textContent='⚠️ Couldn\'t load the natural voice, so the '+devWord()+'\'s own voice is being used. ('+AI.err+')';
     else e.textContent='Will download the first time it is needed.';
+    // progress bar and the "do it now" button
+    var b=document.getElementById('aiNow'),bar=document.getElementById('aiBar');if(!b)return;
+    var kok=cfg.ai.on&&isKokoro(cfg.ai.voice),cc=kok&&VC.ready?bgCount():[0,0],left=cc[1]-cc[0];
+    var show=kok&&AI.state!=='error'&&(left>0||!VC.ready);
+    b.style.display=bar.style.display=show?'':'none';
+    if(AI.state==='error')BG.now=false;
+    bar.firstChild.style.width=(cc[1]?Math.round(100*cc[0]/cc[1]):0)+'%';
+    b.textContent=BG.now?'Pause':'⚡ Save them all now';b.className='btn '+(BG.now?'':'primary');
+  }
+  function aiNowTap(){
+    if(BG.now){BG.now=false;aiStatus();return;}
+    BG.now=true;keepAwake();aiLoad();aiStatus();setTimeout(bgTick,50);
   }
   function aiLoad(){
     if(!cfg.ai.on||AI.state==='loading')return;
@@ -1300,7 +1316,13 @@
     if(!cfg.kids.some(function(kd){return kd&&kd.name;}))return false;
     return true;
   }
-  function bgIdle(){return !document.hidden&&Date.now()-BG.last>=45000;}
+  // Keeps working while the board is in use too (the voice runs in its own thread, so taps stay quick).
+  // It only leaves a short gap after each touch, so a line someone just asked for goes first,
+  // and stays out of the way while the camera or a video is on.
+  function bgIdle(){
+    if(document.hidden||document.querySelector('video'))return false;
+    return BG.now||Date.now()-BG.last>=4000;
+  }
   function allStepsFor(k){
     var ids={};
     for(var di=0;di<7;di++){var d=cfg.days&&cfg.days[di];((d&&d.kids&&d.kids[k])||[]).forEach(function(id){ids[id]=1;});}
@@ -1372,15 +1394,15 @@
     if(KQ.busy||KQ.live.length)return;
     var v=cfg.ai.voice,L=bgWants(),t=null;
     for(var i=0;i<L.length;i++)if(!vcHas(v,L[i])&&!BG.failed[L[i]]){t=L[i];break;}
-    if(!t){vcPrune(v,L);return;}
+    if(!t){if(BG.now){BG.now=false;aiStatus();}vcPrune(v,L);return;}
     BG.working=true;
     kwJob(t,v,false).then(function(b){vcPut(v,t,b);},function(){BG.failed[t]=1;}).then(function(){
       BG.working=false;
       if(document.getElementById('aiStatus'))aiStatus();
-      setTimeout(bgTick,250);   // keep going while the board stays idle
+      setTimeout(bgTick,BG.now?50:250);   // keep going
     });
   }
-  setInterval(bgTick,15000);
+  setInterval(bgTick,4000);
   // once a day: drop clips nobody needs (another voice, or unused for two months)
   function vcPrune(v,wants){
     if(BG.pruned===today()||!VC.db)return;BG.pruned=today();
@@ -3949,6 +3971,9 @@
     avs.addEventListener('change',function(){cfg.ai.voice=avs.value;sv();AI.state='off';AI.failedAt=0;if(cfg.ai.on)aiLoad();aiStatus();});
     ac.appendChild(sField('Which voice','Kokoro voices sound the most natural but can take a moment longer to start talking.',[avs]));
     ac.appendChild(el('p',{'class':'status',id:'aiStatus'},''));
+    var bar=el('div',{id:'aiBar','class':'vbar',style:'display:none'});bar.appendChild(el('i'));ac.appendChild(bar);
+    var nowB=sBtn('⚡ Save them all now','primary',aiNowTap);nowB.id='aiNow';nowB.style.display='none';
+    var nw=el('div',{style:'margin-top:10px'});nw.appendChild(nowB);ac.appendChild(nw);
     setTimeout(aiStatus,0);
     inner.appendChild(ac);
     var tc=sCard();
