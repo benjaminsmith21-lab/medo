@@ -763,7 +763,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='20 Nov 2026 · trophy case layout';
+  var BOARD_VERSION='20 Nov 2026 · lighter voice saving';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1071,8 +1071,8 @@
       e.textContent=(all?'✅ Natural voice ready. All '+c[1]+' usual sentences are saved, so it speaks straight away.'
         :'⏳ Saving the usual sentences in the natural voice so it can speak straight away: '+c[0]+' of '+c[1]+' done.'+
           (AI.genS?' About '+Math.max(1,Math.round((c[1]-c[0])*AI.genS/60))+' minutes to go.':'')+
-          (BG.now?' Working flat out. Keep this screen open.':' It keeps going in the background while the board is on.'))+
-        (AI.genS&&KW?' ('+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence, '+(KW.iso?Math.min(4,Math.ceil((KW.cores||1)/2))+' processor cores)':'1 processor core)'):'')+
+          (BG.now?' Working on it now. Keep this screen open.':' It works on this when nobody has used the board for a minute.'))+
+        (AI.genS&&KW?' ('+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence, '+(KW.threads>1?KW.threads+' processor cores)':'1 processor core)'):'')+
         (!all&&(AI.slowN||0)>=3?' Until then, the '+devWord()+'\'s own voice fills in for new sentences.':'');
     }
     else if(AI.state==='loading'&&BG.now)e.textContent='⏳ Downloading the voice first… '+(AI.pct?AI.pct+'%':'');
@@ -1127,9 +1127,9 @@
   var KW=null,kwWait={},kwN=0;
   function kokoroWorker(onStatus){
     if(!KW){
-      try{KW=new Worker(new URL('tts/kokoro/worker.js',location.href),{type:'module'});}catch(e){onStatus({type:'error',msg:'background voice not supported'});return;}
+      try{KW=new Worker(new URL('tts/kokoro/worker.js?v=2',location.href),{type:'module'});}catch(e){onStatus({type:'error',msg:'background voice not supported'});return;}
       KW.onmessage=function(e){var d=e.data||{};
-        if(d.type==='ready'){KW.ready=true;KW.iso=d.iso;KW.cores=d.cores;setTimeout(kwPump,0);}
+        if(d.type==='ready'){KW.ready=true;KW.iso=d.iso;KW.cores=d.cores;KW.threads=d.threads||1;setTimeout(kwPump,0);}
         if(d.type==='audio'&&d.ms){var sec=d.ms/1000;AI.genS=AI.genS?AI.genS*0.8+sec*0.2:sec;}   // how long a sentence takes on this device
         if(d.type==='audio'||d.type==='fail'){var w=kwWait[d.id];delete kwWait[d.id];if(w)(d.type==='audio'?w[0](d.blob):w[1]());}
         else if(KW.onStatus)KW.onStatus(d);};
@@ -1307,7 +1307,7 @@
   // ----- Making phrases ahead of time, while the board is idle -----
   // Waits until nobody has touched the board for 2 minutes, makes one sentence at a time in the
   // background worker, and stops as soon as someone touches the screen.
-  var BG={last:Date.now(),working:false,list:null,listAt:0,failed:{},pruned:''};
+  var BG={last:Date.now(),restUntil:0,working:false,list:null,listAt:0,failed:{},pruned:''};
   document.addEventListener('pointerdown',function(){BG.last=Date.now();},true);
   document.addEventListener('keydown',function(){BG.last=Date.now();},true);
   function bgAllowed(){
@@ -1316,12 +1316,15 @@
     if(!cfg.kids.some(function(kd){return kd&&kd.name;}))return false;
     return true;
   }
-  // Keeps working while the board is in use too (the voice runs in its own thread, so taps stay quick).
-  // It only leaves a short gap after each touch, so a line someone just asked for goes first,
-  // and stays out of the way while the camera or a video is on.
+  // Only while nobody is using the board (or when a grown-up taps "Save them all now"), never while
+  // the camera or a video is on, and not on a low battery that isn't charging. Working while the
+  // board was in use made Android report that Chrome wasn't responding.
+  var BATT=null;try{navigator.getBattery&&navigator.getBattery().then(function(b){BATT=b;});}catch(e){}
   function bgIdle(){
     if(document.hidden||document.querySelector('video'))return false;
-    return BG.now||Date.now()-BG.last>=4000;
+    if(BATT&&!BATT.charging&&BATT.level<0.4)return false;
+    if(Date.now()<BG.restUntil)return false;
+    return BG.now||Date.now()-BG.last>=60000;
   }
   function allStepsFor(k){
     var ids={};
@@ -1395,11 +1398,14 @@
     var v=cfg.ai.voice,L=bgWants(),t=null;
     for(var i=0;i<L.length;i++)if(!vcHas(v,L[i])&&!BG.failed[L[i]]){t=L[i];break;}
     if(!t){if(BG.now){BG.now=false;aiStatus();}vcPrune(v,L);return;}
-    BG.working=true;
+    BG.working=true;var t0=Date.now();
     kwJob(t,v,false).then(function(b){vcPut(v,t,b);},function(){BG.failed[t]=1;}).then(function(){
       BG.working=false;
+      // rest between sentences so the tablet stays cool and responsive: as long as the last one took
+      // (a short breather even when a grown-up asked for everything now)
+      var took=Date.now()-t0;BG.restUntil=Date.now()+(BG.now?Math.min(1500,took/3):took);
       if(document.getElementById('aiStatus'))aiStatus();
-      setTimeout(bgTick,BG.now?50:250);   // keep going
+      setTimeout(bgTick,(BG.restUntil-Date.now())+50);
     });
   }
   setInterval(bgTick,4000);

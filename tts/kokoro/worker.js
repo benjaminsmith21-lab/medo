@@ -1,5 +1,5 @@
 // Runs the Kokoro voice off the main thread, so the board never freezes while it thinks.
-import { KokoroTTS, env } from './kokoro.web.js';
+import { KokoroTTS, env } from './kokoro.web.js?v=2';
 
 // Saved clips are kept on the device, so make them small: trim the silence at each end
 // (keeping a short natural pause) and store 16-bit sound instead of 32-bit.
@@ -24,16 +24,19 @@ let tts = null, loading = null, queue = Promise.resolve();
 self.onmessage = (e) => {
   const d = e.data || {};
   if (d.type === 'load') {
-    if (tts) { postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1 }); return; }
+    if (tts) { postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1, threads: env.numThreads || 1 }); return; }
     if (loading) return;
     env.wasmPaths = d.wasm;
+    // At most 2 processor cores, so the tablet and Chrome always have room to respond.
+    // (Using 4 starved the tablet and made Android say Chrome wasn't responding.)
+    try { env.numThreads = self.crossOriginIsolated ? Math.min(2, Math.max(1, (navigator.hardwareConcurrency || 2) - 2)) : 1; } catch (e) {}
     loading = KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
       dtype: 'q8', device: 'wasm',
       progress_callback: (p) => {
         if (p && p.status === 'progress' && /\.onnx$/.test(p.file || '') && p.progress != null)
           postMessage({ type: 'progress', pct: Math.round(p.progress) });
       },
-    }).then((t) => { tts = t; postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1 }); })
+    }).then((t) => { tts = t; postMessage({ type: 'ready', iso: !!self.crossOriginIsolated, cores: navigator.hardwareConcurrency || 1, threads: env.numThreads || 1 }); })
       .catch((err) => { loading = null; postMessage({ type: 'error', msg: String((err && err.message) || err).slice(0, 120) }); });
     return;
   }
