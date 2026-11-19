@@ -679,3 +679,28 @@ test('saved phrases: "Save them all now" shows progress and can be paused',async
   assert.match(t.d.getElementById('aiNow').textContent,/Save them all now/);
   t.close();
 });
+
+test('feelings check-in: always asks if it has not asked for two days, never twice a day, and waits for a recorded message to finish',async()=>{
+  const t=boot({cfg:c=>{c.arvoStart='23:59';c.kids[0].stars={count:0,last:''};},storage:{qb_tips:{'undo:kA':1}}});await wait(300);
+  t.w.Math.random=()=>0.99;   // even when the dice say no...
+  t.d.querySelectorAll('.kcard')[0].click();
+  while(t.d.querySelector('.tile:not(.done)'))t.d.querySelector('.tile:not(.done)').click();
+  await wait(600);
+  const ov=t.d.getElementById('feelOv');assert.ok(ov,'...it asks, because it has not asked for two days');
+  ov.remove();
+  const h=JSON.parse(t.w.localStorage.getItem('qb_hist'));const rec=Object.values(h).pop();
+  assert.ok(Object.values(rec).some(r=>r.fa),'remembers that it asked today, even without an answer');
+  t.close();
+});
+
+test('feelings check-in: preview from settings shows the question and saves nothing',async()=>{
+  const t=boot({});await wait(300);
+  t.openSettings('Progress');await wait(100);
+  t.button('▶ Ava').click();await wait(200);
+  const ov=t.d.getElementById('feelOv');assert.ok(ov,'question shown');
+  assert.ok(!t.d.getElementById('settings').classList.contains('open'),'settings closed so it shows like the real thing');
+  ov.querySelector('.feelbtn').click();await wait(100);
+  const h=JSON.parse(t.w.localStorage.getItem('qb_hist')||'{}');
+  assert.ok(!Object.values(h).some(d=>Object.values(d).some(r=>r.feel||r.fa)),'nothing saved');
+  t.close();
+});

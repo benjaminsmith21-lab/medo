@@ -763,7 +763,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='18 Nov 2026 · save voice now';
+  var BOARD_VERSION='19 Nov 2026 · feelings check-in fixes';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1553,6 +1553,7 @@
       if(prev.t0!=null)rec.t0=prev.t0;else if(rec.done.length===1&&!(prev.done&&prev.done.length))rec.t0=nowM;
       if(recStats(rec).amAll){if(prev.amAt!=null)rec.amAt=prev.amAt;else if(rec.t0!=null&&prev.am&&!recStats(prev).amAll)rec.amAt=nowM;}
       if(prev.feel)rec.feel=prev.feel;
+      if(prev.fa)rec.fa=1;
       if(rec.amAt!=null){var lm=leaveMinToday();if(prev.early!=null)rec.early=prev.early;else if(lm!=null)rec.early=lm-rec.amAt;}
       var j=JSON.stringify(rec);if(JSON.stringify(day[kd.id])!==j){day[kd.id]=rec;changed=true;}
     }
@@ -2438,7 +2439,13 @@
       if(!tipSeen('undo:'+kidId(k))){markTip('undo:'+kidId(k));lines.push('Oops, wrong one? Hold your finger on it to undo.');}
       var vm=msgAfterTick(k,left===0?per:'',star,s.id);
       var ask=big?function(){feelCheck(k,per);}:null;
-      say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)],ask);}:ask);
+      // a recorded message comes first; the feelings question waits until it has finished
+      say(lines.join(' '),vm?function(){playMsg(vm,[kidId(k)],function(ok){
+        if(!ask)return;var a=msgAudio,f=false;
+        function go(){if(f)return;f=true;setTimeout(ask,700);}
+        if(!ok||!a||!a.addEventListener){go();return;}
+        a.addEventListener('ended',go);a.addEventListener('pause',go);setTimeout(go,120000);
+      });}:ask);
       if(big&&!isSplit()){clearTimeout(idleT);idleT=setTimeout(goHome,milestone||star?8000:6000);}
     }
     save('qb_prog',prog);
@@ -2527,13 +2534,18 @@
     var t=today(),kd=cfg.kids[k];if(!hist[t]||!hist[t][kd.id])recordToday();
     var r=hist[t]&&hist[t][kd.id];if(!r)return;r.feel=r.feel||{};r.feel[per]=v;save('qb_hist',hist);
   }
-  function feelDue(k){   // a few times a week at random, never twice in one day, so it stays a real question
-    var kd=cfg.kids[k],r=hist[today()]&&hist[today()][kd.id];if(r&&r.feel)return false;
-    return Math.random()<0.4;
+  // A few times a week, never twice in one day, so it stays a real question: always asks if it
+  // hasn't asked for two days, otherwise about one finish in three.
+  function feelDue(k){
+    var kd=cfg.kids[k],r=hist[today()]&&hist[today()][kd.id];if(r&&(r.feel||r.fa))return false;
+    for(var i=1;i<=2;i++){var pr=histRec(ymd(addDays(today0(),-i)),kd.id);if(pr&&(pr.feel||pr.fa))return Math.random()<0.35;}
+    return true;
   }
-  function feelCheck(k,per){
-    if(cfg.feelings===false||!feelDue(k))return;
-    var kd=cfg.kids[k],band=FEEL[ageBand(kd)],old=document.getElementById('feelOv');if(old)old.remove();
+  function feelCheck(k,per,preview){
+    if(!preview&&(cfg.feelings===false||!feelDue(k)))return;
+    var kd=cfg.kids[k];
+    if(!preview){var t=today();if(!hist[t]||!hist[t][kd.id])recordToday();var hr=hist[t]&&hist[t][kd.id];if(hr){hr.fa=1;save('qb_hist',hist);}}   // asked today
+    var band=FEEL[ageBand(kd)],old=document.getElementById('feelOv');if(old)old.remove();
     var ov=el('div',{id:'feelOv'}),box=el('div',{'class':'feelbox'});
     box.appendChild(el('div',{'class':'feelkid'},kd.emoji));
     var q=fillN(freshPick(kd,'q',band.q),kd,per);
@@ -2541,9 +2553,9 @@
     var row=el('div',{'class':'feelrow'}),closeT=setTimeout(function(){ov.remove();},25000);
     band.opts.forEach(function(o){
       var b=el('button',{'class':'feelbtn'});b.appendChild(el('span',{'class':'feelem'},o[1]));b.appendChild(el('span',null,o[2]));
-      b.addEventListener('click',function(){clearTimeout(closeT);setFeel(k,per,o[0]);stats('feeling',o[0]);
+      b.addEventListener('click',function(){clearTimeout(closeT);if(!preview){setFeel(k,per,o[0]);stats('feeling',o[0]);}
         var f=o[2].toLowerCase(),reply=fillN(freshPick(kd,'f',band.say),kd,per).replace(/\{f\}/g,f).replace(/\{F\}/g,o[2]);
-        if(o[0]==='low'){reply+=band.low;addNote(k,per,o);}
+        if(o[0]==='low'){reply+=band.low;if(!preview)addNote(k,per,o);}
         row.innerHTML='';row.appendChild(el('div',{'class':'feelreply'},o[1]+' '+reply));
         say(reply,function(){setTimeout(function(){ov.remove();},1200);});setTimeout(function(){ov.remove();},9000);});
       row.appendChild(b);
@@ -3803,7 +3815,9 @@
     inner.appendChild(el('div',{style:'height:12px'}));
     proofCard(inner);
     var fc=sCard('💬 How they feel');
-    fc.appendChild(sField('Ask how they feel when they finish','A few times a week, at random, so it stays a real question. If they choose grumpy or tricky, you\'ll get a note.',[sSwitch(cfg.feelings!==false,function(v){cfg.feelings=v;sv();renderSettings();})]));
+    fc.appendChild(sField('Ask how they feel when they finish','A few times a week, never more than once a day, and at least every other day. If they choose grumpy or tricky, you\'ll get a note.',[sSwitch(cfg.feelings!==false,function(v){cfg.feelings=v;sv();renderSettings();})]));
+    var pv=[];cfg.kids.forEach(function(kd,k){if(kd.name)pv.push(sBtn('▶ '+kd.name,'',function(){document.getElementById('closeSettings').click();feelCheck(k,curPeriod(),true);}));});
+    if(pv.length)fc.appendChild(sField('See what it looks like','Shows the question now. Nothing is saved.',pv));
     inner.appendChild(fc);
     var keys=Object.keys(hist).sort();
     var t=today0(),from=addDays(t,-(sRange-1));
