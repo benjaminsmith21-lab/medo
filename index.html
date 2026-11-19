@@ -763,7 +763,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='20 Nov 2026 · lighter voice saving';
+  var BOARD_VERSION='20 Nov 2026 · voice saving paused';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1071,7 +1071,7 @@
       e.textContent=(all?'✅ Natural voice ready. All '+c[1]+' usual sentences are saved, so it speaks straight away.'
         :'⏳ Saving the usual sentences in the natural voice so it can speak straight away: '+c[0]+' of '+c[1]+' done.'+
           (AI.genS?' About '+Math.max(1,Math.round((c[1]-c[0])*AI.genS/60))+' minutes to go.':'')+
-          (BG.now?' Working on it now. Keep this screen open.':' It works on this when nobody has used the board for a minute.'))+
+          (BG.now?' Working on it now. Keep this screen open, and touch nothing until it is done.':' Tap the button to save them, ideally while the '+devWord()+' is charging and nobody needs it (for example overnight). New sentences are also saved the first time they are said.'))+
         (AI.genS&&KW?' ('+(AI.genS<10?AI.genS.toFixed(1):Math.round(AI.genS))+' seconds per sentence, '+(KW.threads>1?KW.threads+' processor cores)':'1 processor core)'):'')+
         (!all&&(AI.slowN||0)>=3?' Until then, the '+devWord()+'\'s own voice fills in for new sentences.':'');
     }
@@ -1308,7 +1308,9 @@
   // Waits until nobody has touched the board for 2 minutes, makes one sentence at a time in the
   // background worker, and stops as soon as someone touches the screen.
   var BG={last:Date.now(),restUntil:0,working:false,list:null,listAt:0,failed:{},pruned:''};
-  document.addEventListener('pointerdown',function(){BG.last=Date.now();},true);
+  document.addEventListener('pointerdown',function(e){BG.last=Date.now();
+    // someone is using the board: stop "Save them all now" (unless it's the grown-up in settings)
+    if(BG.now&&!(e.target.closest&&e.target.closest('#settings'))){BG.now=false;}},true);
   document.addEventListener('keydown',function(){BG.last=Date.now();},true);
   function bgAllowed(){
     if(!cfg.ai||!cfg.ai.on||!isKokoro(cfg.ai.voice)||!cfg.voice)return false;
@@ -1324,7 +1326,7 @@
     if(document.hidden||document.querySelector('video'))return false;
     if(BATT&&!BATT.charging&&BATT.level<0.4)return false;
     if(Date.now()<BG.restUntil)return false;
-    return BG.now||Date.now()-BG.last>=60000;
+    return BG.now;   // only when a grown-up asks (Save them all now); never on its own any more
   }
   function allStepsFor(k){
     var ids={};
@@ -5355,7 +5357,7 @@
       if(busy){setTimeout(coiReload,30000);return;}   // not while someone is using it: try again later
       sessionStorage.setItem('qb_coi','1');location.reload();}catch(e){}
   }
-  try{if('serviceWorker' in navigator&&location.protocol==='https:'){setTimeout(coiReload,1500);navigator.serviceWorker.addEventListener('controllerchange',function(){setTimeout(coiReload,500);});}}catch(e){}
+  // (coiReload switched off with the isolation headers, 20 Nov 2026)
   document.getElementById('updBar').addEventListener('click',applyUpdate);
   var installEvt=null;
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;});

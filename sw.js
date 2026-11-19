@@ -24,7 +24,11 @@ self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.ski
 // processor core; with them it uses up to four, which makes the natural voice several times faster.
 // GitHub Pages can't send these headers, so the service worker adds them to the board's own files.
 // "credentialless" still lets the fonts and other sites' files load as before.
+// Switched off 20 Nov 2026: more processor cores for the voice coincided with Android reporting
+// "Chrome isn't responding" and the board resetting. Back to the setup that ran smoothly for weeks.
+const ISOLATE = false;
 function iso(res) {
+  if (!ISOLATE) return res;
   if (!res || res.status === 0 || res.type === 'opaque' || res.type === 'opaqueredirect') return res;
   const h = new Headers(res.headers);
   h.set('Cross-Origin-Opener-Policy', 'same-origin');
