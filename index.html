@@ -431,7 +431,7 @@
   .tlsub{font-size:13px;color:var(--muted);font-weight:700}
   .tclose{width:64px;height:64px;border-radius:50%;border:none;background:#2f3670;color:#fff;font-size:30px;font-weight:800;cursor:pointer;flex:none}
   .tsec{margin-top:18px}.tsec h3{font-size:22px;color:#ffd96a;margin:0 0 12px}
-  .trow{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px}
+  .trow{display:flex;flex-wrap:wrap;gap:14px;padding-bottom:6px}
   .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
   .ttile{position:relative;background:#232858;border:none;border-radius:22px;padding:14px 10px 12px;color:#fff;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;min-width:140px;box-shadow:0 5px 0 #12153a}
   .ttile:active{transform:translateY(3px);box-shadow:0 2px 0 #12153a}
@@ -763,7 +763,7 @@
 
 <script>
 (function(){
-  var BOARD_VERSION='19 Nov 2026 · feelings check-in fixes';
+  var BOARD_VERSION='20 Nov 2026 · trophy case layout';
   var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var AVATARS=['🦊','🐢','🦁','🐼','🐸','🦄','🐯','🐵','🐶','🐱','🦖','🐙','🚀','🦕','🐨','🐧'];
@@ -1827,6 +1827,17 @@
     hn.appendChild(lv);head.appendChild(hn);
     var x=el('button',{'class':'tclose',title:'Close'},'✕');x.addEventListener('click',closeTrophies);head.appendChild(x);
     box.appendChild(head);
+    // star jar and reading days
+    var sj=kd.stars.count||0,rd=kd.reads.count||0,reads=hasReading(k)||rd>0;
+    var cs=el('div',{'class':'tsec'});cs.appendChild(el('h3',null,reads?'⭐ My star jar & 📚 reading':'⭐ My star jar'));
+    var crow=el('div',{'class':'trow'});
+    var jarB=el('button',{'class':'rwcard'});jarB.appendChild(el('span',{'class':'rwce'},'⭐'));jarB.appendChild(el('b',null,sj+(sj===1?' star':' stars')));jarB.appendChild(el('span',null,'in my star jar'));
+    jarB.addEventListener('click',function(){bumpIdle();say(sj?'You have '+sj+(sj===1?' star':' stars')+' in your star jar! You get one every day you finish all your quests.':'Your star jar is empty. Finish all your quests in a day to get a star!');});
+    crow.appendChild(jarB);
+    if(reads){var rdB=el('button',{'class':'rwcard'});rdB.appendChild(el('span',{'class':'rwce'},'📚'));rdB.appendChild(el('b',null,rd+(rd===1?' day':' days')));rdB.appendChild(el('span',null,'of reading'));
+      rdB.addEventListener('click',function(){bumpIdle();say(rd?'You have read on '+rd+(rd===1?' day':' days')+'!':'Tick the reading quest after you read, and your reading days will show up here.');});
+      crow.appendChild(rdB);}
+    cs.appendChild(crow);box.appendChild(cs);
     // monthly challenge
     var now=new Date(),ym=today().slice(0,7),g=monthGoal(),mi=now.getMonth();
     var mfull=(s.months[ym]||{full:0}).full;

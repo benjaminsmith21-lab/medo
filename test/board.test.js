@@ -704,3 +704,13 @@ test('feelings check-in: preview from settings shows the question and saves noth
   assert.ok(!Object.values(h).some(d=>Object.values(d).some(r=>r.feel||r.fa)),'nothing saved');
   t.close();
 });
+
+test('trophy case shows the star jar and reading days, and rows wrap instead of scrolling sideways',async()=>{
+  const t=boot({cfg:c=>{c.kids[0].stars={count:7,last:''};c.kids[0].reads={count:12,last:''};c.days[1].kids[0].push('reading');}});await wait(300);
+  t.d.querySelector('.pill.troph').click();await wait(200);
+  const ov=t.d.getElementById('trophyOv');
+  assert.match(ov.textContent,/7 stars/);assert.match(ov.textContent,/12 days/);
+  const css=[...t.d.querySelectorAll('style')].map(s=>s.textContent).join('');
+  assert.match(css,/\.trow\{display:flex;flex-wrap:wrap/);
+  t.close();
+});
